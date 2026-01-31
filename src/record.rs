@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub struct Record {
-    fields: HashMap<String, String>, // identical to RecordFields for now. this would be a fully type qualified struct in a more complete implementation.
+    fields: HashMap<String, String>, // identical to RecordFields for now.
 }
 
 pub struct RecordFields {
@@ -32,17 +32,10 @@ pub enum RecordType {
     // ... there are loads more.
 }
 
-// Wonder if there's a way to auto-generate these from the field dictionary?
-// Also curious if there's a way to autoconvert the string values into typed members of the struct. I think I've seen crates like that.
-//   The alternative is to have basically a huge match statement like:
-//      match type_name {
-//          "SYSCALL" => RecordType::Syscall,
-//          "CWD" => RecordType::Cwd,
-//          ...
-//          _ => panic!("Unknown record type"),
-//      }
-
-// Might be more complexity than it's worth.
+// TODO: Consider auto-generating types from the field dictionary.
+// Could use serde, strum, or similar crates for automatic string-to-typed conversion.
+// Alternative: Large match statement to convert string type names to RecordType enum variants.
+// Evaluate if the complexity is justified for this use case.
 
 impl Record {
     pub fn new(fields: HashMap<String, String>) -> Self {
