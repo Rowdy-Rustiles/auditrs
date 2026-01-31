@@ -1,5 +1,4 @@
 // Audit record parsing
-
 // General flow for parsing an audit record:
 // 1. Open file (e.g., /var/log/audit/audit.log).
 // 2. Read lines from the file.
@@ -23,15 +22,10 @@
     
     For now, let's just grab all the key=value pairs.
 */
-
+use crate::record::Record;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-
-#[derive(Debug, PartialEq)]
-pub struct Record {
-    fields: HashMap<String, String>, // identical to RecordFields for now. this would be a fully type qualified struct in a more complete implementation.
-}
 
 struct RecordFields {
         fields: HashMap<String, String>,
@@ -40,11 +34,12 @@ struct RecordFields {
 
 #[derive(Debug)]
 pub enum ParseError {
-    FileNotFound,
-    FailedToReadLine,
+    FileNotFound, // could not open the specified file
+    FailedToReadLine, //  still I/O, don't know how it would fail. malformed data that spreads over one line?
     InvalidLine(String),
+    //EmptyFile         // todo
 }
-
+ 
 pub fn parse_log_file(filepath: String) -> Result<Vec<Record>, ParseError> {
     let file = File::open(filepath).map_err(|_| ParseError::FileNotFound)?;
     let reader = BufReader::new(file);
@@ -81,7 +76,7 @@ fn read_to_fields(line: &str) -> Result<RecordFields, ParseError> {
 }
 
 fn parse_to_record(record_fields: RecordFields) -> Result<Record, ParseError> {
-    Ok(Record { fields: record_fields.fields })
+    Ok(Record::new(record_fields.fields)) // Since record is still just a wrapper around HashMap, this is straightforward. Can't fail.
 }
 
 #[cfg(test)]
@@ -89,12 +84,13 @@ mod tests {
 
     use super::*;
 
+    // Helper function to create a Record from key-value.
     fn record_from_kv(pairs: Vec<(&str, &str)>) -> Record {
         let mut fields = HashMap::new();
         for (k, v) in pairs {
             fields.insert(k.to_string(), v.to_string());
         }
-        Record { fields }
+        Record::new(fields)
     }    
     #[test]
     fn test_parse_log_file() {
@@ -184,6 +180,7 @@ mod tests {
         let result = read_to_fields(invalid_line);
         assert!(matches!(result, Err(ParseError::InvalidLine(_))));
     }
+
 
     #[test]
     fn test_empty_line() {
