@@ -1,0 +1,5 @@
+.vscode/
+.vscode/*
+.venv/
+build/
+data_discovery.egg/
