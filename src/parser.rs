@@ -19,7 +19,7 @@
     type=CWD msg=audit(1364481363.243:24287):  cwd="/home/shadowman"
     type=PATH msg=audit(1364481363.243:24287): item=0 name="/etc/ssh/sshd_config" inode=409248 dev=fd:00 mode=0100600 ouid=0 ogid=0 rdev=00:00 obj=system_u:object_r:etc_t:s0  objtype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0
     type=PROCTITLE msg=audit(1364481363.243:24287) : proctitle=636174002F6574632F7373682F737368645F636F6E666967
-    
+
     For now, let's just grab all the key=value pairs.
 */
 use crate::record::Record;
@@ -40,11 +40,11 @@ pub enum ParseError {
     InvalidLine(String),
 }
 
-///
+
 /// Fields like SADDR={ saddr_fam=netlink nlnk-fam=16 nlnk-pid=0 } need whitespace removed to parse grouped values together.
 /// Depending on how common this pattern is in these logs, we might want to make the parser robust enough to handle nested
-/// key-value pairs. 
-/// 
+/// key-value pairs.
+///
 pub fn parse_log_file(filepath: String) -> Result<Vec<Record>, ParseError> {
     let file = File::open(filepath).map_err(|_| ParseError::FileNotFound)?;
     let reader = BufReader::new(file);
@@ -66,7 +66,7 @@ fn read_to_fields(line: &str) -> Result<RecordFields, ParseError> {
     if line.is_empty() {
         return Err(ParseError::InvalidLine(line.to_string()));
     }
-    
+
     for part in line.split_whitespace() {
         if let Some(eq_pos) = part.find('=') {
             let key = &part[..eq_pos];
@@ -79,7 +79,7 @@ fn read_to_fields(line: &str) -> Result<RecordFields, ParseError> {
             return Err(ParseError::InvalidLine(line.to_string()));
         }
     }
-    
+
     Ok(RecordFields { fields })
 }
 
@@ -108,10 +108,10 @@ mod tests {
                         type=CWD msg=audit(1364481363.243:24287):  cwd=\"/home/shadowman\"\n\
                         type=PATH msg=audit(1364481363.243:24287): item=0 name=\"/etc/ssh/sshd_config\" inode=409248 dev=fd:00 mode=0100600 ouid=0 ogid=0 rdev=00:00 obj=system_u:object_r:etc_t:s0  objtype=NORMAL cap_fp=none cap_fi=none cap_fe=0 cap_fver=0\n\
                         type=PROCTITLE msg=audit(1364481363.243:24287) : proctitle=636174002F6574632F7373682F737368645F636F6E666967";
-        
+
         let temp_file_path = "test_audit.log";
         std::fs::write(temp_file_path, test_log).unwrap();
-        
+
         let records = parse_log_file(temp_file_path.to_string()).unwrap();
         assert_eq!(records, vec![
             record_from_kv(vec![
@@ -171,10 +171,10 @@ mod tests {
                 ("type", "PROCTITLE"),
                 ("msg", "audit(1364481363.243:24287)"),
                 ("proctitle", "636174002F6574632F7373682F737368645F636F6E666967"),
-            
+
             ])
         ]);
-        
+
         std::fs::remove_file(temp_file_path).unwrap();
     }
 
@@ -205,14 +205,14 @@ mod tests {
     fn test_empty_log() {
         let temp_file_path = "empty_audit.log";
         std::fs::write(temp_file_path, "").unwrap();
-        
+
         let result = parse_log_file(temp_file_path.to_string());
         std::fs::remove_file(temp_file_path).unwrap();
 
         assert!(result.is_ok());
         let records = result.unwrap();
         assert!(records.is_empty());
-        
+
     }
 
     #[test]
