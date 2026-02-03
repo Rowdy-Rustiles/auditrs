@@ -12,23 +12,23 @@
     in a HashMap for now, then gradually converting known fields to typed members of the Record struct.
 */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::SystemTime};
 
 use strum_macros::EnumString;
 
 #[derive(Debug, PartialEq)]
-pub struct Record {
-    fields: HashMap<String, String>, // identical to RecordFields for now.
+pub struct AuditRecord {
+    // Essential values, all records will have this
+    pub record_type: RecordType,
+    pub timestamp: SystemTime,
+    pub serial: u64, 
+    // Fields that are unique to each recordtype.
+    pub data: RecordData,
 }
 
-pub struct RecordFields {
-    pub fields: HashMap<String, String>,
-}
+pub type RecordData = HashMap<String, String>;
 
-/// This is a good starting point for typed records. Just read the 'TYPE' field and kaboom.
-/// Using strum allows us to automatically convert log types like NETFILTER_CFG and SYSCALL
-/// to their enum equivalent by calling RecordType::from_str(<type_string>) on the type that
-/// we wish to translate.
+
 #[derive(EnumString, PartialEq, Debug)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecordType {
@@ -57,19 +57,10 @@ pub enum RecordType {
     Login,
     UserAcct,
     CredDisp,
+    Unknown(String)
     // ... there are loads more.
 }
 
-// TODO: Consider auto-generating types from the field dictionary.
-// Could use serde, strum, or similar crates for automatic string-to-typed conversion.
-// Alternative: Large match statement to convert string type names to RecordType enum variants.
-// Evaluate if the complexity is justified for this use case.
-
-impl Record {
-    pub fn new(fields: HashMap<String, String>) -> Self {
-        Record { fields }
-    }
-}
 
 #[cfg(test)]
 mod tests {
