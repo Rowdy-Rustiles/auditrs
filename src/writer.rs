@@ -1,34 +1,34 @@
-use crate::event::AuditEvent;
+// use crate::event::AuditEvent;
 
-struct Writer {
-    output_format: OutputFormat,
-    destination: String,
-}
+// struct Writer {
+//     output_format: OutputFormat,
+//     destination: String,
+// }
 
-enum WriteError {
-    Unknown,
-}
+// enum WriteError {
+//     Unknown,
+// }
 
-enum OutputFormat {
-    Legacy,
-    JSON,
-}
+// enum OutputFormat {
+//     Legacy,
+//     JSON,
+// }
 
-impl Writer {
-    pub fn write_event(self, event: AuditEvent) -> Result<(), WriteError> {
-        // Returns Ok(()) if nothing went wrong.
-        match self.output_format {
-            OutputFormat::Legacy    => self.write_event_legacy(event),
-            OutputFormat::JSON      => self.write_event_json(event),
-        }
-    }
+// impl Writer {
+//     pub fn write_event(self, event: AuditEvent) -> Result<(), WriteError> {
+//         // Returns Ok(()) if nothing went wrong.
+//         match self.output_format {
+//             OutputFormat::Legacy    => self.write_event_legacy(event),
+//             OutputFormat::JSON      => self.write_event_json(event),
+//         }
+//     }
 
-    pub fn write_event_legacy(self, event: AuditEvent) -> Result<(), WriteError> {
-        todo!()
-    }
+//     pub fn write_event_legacy(self, event: AuditEvent) -> Result<(), WriteError> {
+//         todo!()
+//     }
 
-    pub fn write_event_json(self, event: AuditEvent) -> Result<(), WriteError> {
-        todo!()
-    }
+//     pub fn write_event_json(self, event: AuditEvent) -> Result<(), WriteError> {
+//         todo!()
+//     }
 
-}
+// }

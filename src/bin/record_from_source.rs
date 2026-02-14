@@ -1,16 +1,20 @@
 use futures::stream::StreamExt;
 use netlink_packet_audit::AuditMessage;
+use netlink_packet_core::{NetlinkPayload, NetlinkMessage};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::signal;
 use auditrs::record::{AuditRecord, RecordType};
+use chrono::{DateTime};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create timestamped filename
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let filename = format!("audit_capture_{}.bin", timestamp);
+    let log_filename = format!("log_file_{}.log", timestamp);
+
 
     println!("Capturing audit messages to: {}", filename);
 
@@ -20,6 +24,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .read(true)
         .truncate(true)
         .open(&filename)?;
+
+        
+    let mut log_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .read(true)
+        .truncate(true)
+        .open(&log_filename)?;
 
     let (connection, mut handle, mut messages) =
         audit::new_connection().map_err(|e| format!("Connection failed: {}", e))?;
@@ -85,16 +97,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Deserialize back to NetlinkMessage
         match netlink_packet_core::NetlinkMessage::<AuditMessage>::deserialize(&msg_buf) {
             Ok(reconstructed_msg) => {
-                println!("\nMessage {}: Successfully reconstructed", i + 1);
-                println!("Type: {:?}", reconstructed_msg.header.message_type);
-                println!("Length: {}", reconstructed_msg.header.length);
+                let mut data = String::new();
+                if let NetlinkPayload::InnerMessage(inner) = &reconstructed_msg.payload {
+                    if let AuditMessage::Event(event) = inner {
+                        let (eid, kvs) = event;
+                        data = kvs.to_string();
+                    } 
+                }
 
                 // build a test record
-                let record = AuditRecord { record_type: RecordType::from(reconstructed_msg.header.message_type), 
-                timestamp: std::time::SystemTime::now(),
-                serial: 1,
-                data: std::collections::HashMap::<String, String>::new()
-                };
+                let record = AuditRecord::new(RecordType::from(reconstructed_msg.header.message_type), data);
+                log_file.write_all((record.to_log() + "\n").as_str().as_bytes())?;
+                log_file.flush();
 
                 println!("Record object: {:?}", record);
             }
