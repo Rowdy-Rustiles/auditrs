@@ -6,5 +6,13 @@ repository = "https://github.com/downloadjpg/auditrs"
 
 [dependencies]
 libc = "0.2.178"
+netlink-packet-audit = "0.6.1"
 strum = "0.27.2"
 strum_macros = "0.27.2"
+futures = "0.3"
+netlink-packet-core = "0.7"
+netlink-proto = "0.11"
+audit = "0.7.3"
+env_logger = "0.11.8"
+tokio = { version = "1.49.0", features = ["full"] }
+chrono = "0.4.43"
