@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
-use auditrs::event::AuditEvent;
+use auditrs::event::RawAuditEvent;
 use auditrs::{audit_transport::*, correlator};
 use tokio::sync::{mpsc, Mutex};
 use tokio::signal;
@@ -10,7 +10,6 @@ use auditrs::correlator::AuditRecordCorrelator;
 use tokio::time::sleep;
 
 // Type alias allow us to write our data pipeline with informative names without worrying over what the types actually look like.
-type RawAuditMessage = (u16, String); // Analogous to netlink_packet_audit::AuditMessage::Event
 type ParsedAuditMessage = (); // todo; record.rs
 type CorrelatedEvent = (); // todo; event.rs
 
@@ -65,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn spawn_transport_task(
     transport: Arc<Mutex<NetlinkAuditTransport>>, 
-    sender: mpsc::Sender<RawAuditMessage>
+    sender: mpsc::Sender<RawAuditEvent>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Driver code for the transport goes here. Start it up, listen to messages.
@@ -82,7 +81,7 @@ fn spawn_transport_task(
 
 fn spawn_parser_task(
     parser: Arc<Mutex<AuditMessageParser>>,
-    mut receiver: mpsc::Receiver<RawAuditMessage>,
+    mut receiver: mpsc::Receiver<RawAuditEvent>,
     sender: mpsc::Sender<ParsedAuditMessage>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
