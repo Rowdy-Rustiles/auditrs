@@ -1,6 +1,7 @@
-pub mod record;
+pub mod audit_transport;
+pub mod correlator;
 pub mod event;
 pub mod parser;
-pub mod correlator;
+pub mod record;
+mod record_from_source;
 pub mod writer;
-pub mod audit_transport;

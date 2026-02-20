@@ -1,12 +1,12 @@
+use auditrs::record::{AuditRecord, RecordType};
+use chrono::DateTime;
 use futures::stream::StreamExt;
 use netlink_packet_audit::AuditMessage;
-use netlink_packet_core::{NetlinkPayload, NetlinkMessage};
+use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::signal;
-use auditrs::record::{AuditRecord, RecordType};
-use chrono::{DateTime};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,7 +15,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filename = format!("audit_capture_{}.bin", timestamp);
     let log_filename = format!("log_file_{}.log", timestamp);
     let filename_deserialized = format!("audit_deserialized_{}.log", timestamp);
-
 
     println!("Capturing audit messages to: {}", filename);
 
@@ -26,7 +25,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .truncate(true)
         .open(&filename)?;
 
-        
     let mut log_file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -40,7 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .read(true)
         .truncate(true)
         .open(&filename_deserialized)?;
-
 
     let (connection, mut handle, mut messages) =
         audit::new_connection().map_err(|e| format!("Connection failed: {}", e))?;
@@ -111,15 +108,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let AuditMessage::Event(event) = inner {
                         let (eid, kvs) = event;
                         data = kvs.to_string();
-                    } 
+                    }
                 }
 
                 // build a test record
-                let record = AuditRecord::new(RecordType::from(reconstructed_msg.header.message_type), data);
+                let record = AuditRecord::new(
+                    RecordType::from(reconstructed_msg.header.message_type),
+                    data,
+                );
                 log_file.write_all((record.to_log() + "\n").as_str().as_bytes())?;
                 log_file.flush();
 
-                 writeln!(filename_deserialized, "==============================")?;
+                writeln!(filename_deserialized, "==============================")?;
 
                 writeln!(filename_deserialized, "Message {}", i + 1)?;
 

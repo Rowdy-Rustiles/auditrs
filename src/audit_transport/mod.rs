@@ -1,7 +1,7 @@
-pub mod traits;
-mod netlink;
 mod mock;
+mod netlink;
+pub mod traits;
 
-pub use traits::AuditTransport;
-pub use netlink::NetlinkAuditTransport;
 pub use mock::MockSocketReader;
+pub use netlink::NetlinkAuditTransport;
+pub use traits::AuditTransport;
