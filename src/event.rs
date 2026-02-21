@@ -2,6 +2,8 @@ use std::time::SystemTime;
 use crate::record::AuditRecord;
 
 pub struct AuditEvent {
+    // Identifier will be Seconds.Milliseconds:Serial
+
     // pub timestamp: SystemTime,
     // pub serial: u64,
     pub records: Vec<AuditRecord>,
