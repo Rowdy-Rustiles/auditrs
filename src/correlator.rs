@@ -60,11 +60,10 @@ impl AuditRecordCorrelator {
     }
 
     fn correlate_records(record_buffer: Vec<AuditRecord>) -> Vec<AuditEvent> {
-        let event_buffer;
-
-        for record in record_buffer
-        {
-
-        }
+        todo!();
+        // let event_buffer;
+        // for (record in record_buffer){
+           
+        // }
     }
 }
