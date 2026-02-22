@@ -1,18 +1,18 @@
 use std::sync::Arc;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
-use auditrs::event::AuditEvent;
-use auditrs::{audit_transport::*, correlator};
 use tokio::sync::{mpsc, Mutex};
 use tokio::signal;
-use auditrs::writer::AuditLogWriter;
-use auditrs::parser::AuditMessageParser;
-use auditrs::correlator::AuditRecordCorrelator;
 use tokio::time::sleep;
 
-// Type alias allow us to write our data pipeline with informative names without worrying over what the types actually look like.
-type RawAuditMessage = (u16, String); // Analogous to netlink_packet_audit::AuditMessage::Event
-type ParsedAuditMessage = (); // todo; record.rs
-type CorrelatedEvent = (); // todo; event.rs
+use auditrs::{
+    event::*,
+    raw_record::*,
+    writer::*,
+    parser::*,
+    correlator::*,
+    audit_transport::*,
+    parsed_record::*,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn spawn_transport_task(
     transport: Arc<Mutex<NetlinkAuditTransport>>, 
-    sender: mpsc::Sender<RawAuditMessage>
+    sender: mpsc::Sender<RawAuditRecord>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Driver code for the transport goes here. Start it up, listen to messages.
@@ -82,8 +82,8 @@ fn spawn_transport_task(
 
 fn spawn_parser_task(
     parser: Arc<Mutex<AuditMessageParser>>,
-    mut receiver: mpsc::Receiver<RawAuditMessage>,
-    sender: mpsc::Sender<ParsedAuditMessage>
+    mut receiver: mpsc::Receiver<RawAuditRecord>,
+    sender: mpsc::Sender<ParsedAuditRecord>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -95,8 +95,8 @@ fn spawn_parser_task(
 
 fn spawn_correlator_task(
     correlator: Arc<Mutex<AuditRecordCorrelator>>,
-    mut receiver: mpsc::Receiver<ParsedAuditMessage>,
-    sender: mpsc::Sender<CorrelatedEvent>
+    mut receiver: mpsc::Receiver<ParsedAuditRecord>,
+    sender: mpsc::Sender<AuditEvent>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -108,7 +108,7 @@ fn spawn_correlator_task(
 
 fn spawn_writer_task(
     writer: Arc<Mutex<AuditLogWriter>>,
-    mut receiver: mpsc::Receiver<CorrelatedEvent>
+    mut receiver: mpsc::Receiver<AuditEvent>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
