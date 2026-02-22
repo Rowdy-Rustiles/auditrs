@@ -1,16 +1,16 @@
 use std::time::SystemTime;
-use crate::record::AuditRecord;
+use crate::parsed_record::ParsedAuditRecord;
 
 pub struct AuditEvent {
     // Identifier will be Seconds.Milliseconds:Serial
 
     // pub timestamp: SystemTime,
     // pub serial: u64,
-    pub records: Vec<AuditRecord>,
+    pub records: Vec<ParsedAuditRecord>,
 }
 
 impl AuditEvent {
-    pub fn new_simple(record: AuditRecord) -> Self {
+    pub fn new_simple(record: ParsedAuditRecord) -> Self {
         Self {
             // timestamp: record.timestamp,
             // serial: record.serial,

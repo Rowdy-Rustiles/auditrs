@@ -1,4 +1,4 @@
-/* Combine multiple AuditRecords into a singular AuditEvent
+/* Combine multiple ParsedAuditRecords into a singular AuditEvent
 
    https://man7.org/linux/man-pages/man5/auditd.conf.5.html
    ^ Refer to Notes section:
@@ -41,13 +41,13 @@
  */
 
 use std::time::SystemTime;
-use crate::record::AuditRecord;
+use crate::parsed_record::ParsedAuditRecord;
 use crate::event::AuditEvent;
 
 pub struct AuditRecordCorrelator {
     curr_timestamp: SystemTime,
     curr_serial: u16,
-    curr_records: Vec<AuditRecord>,
+    curr_records: Vec<ParsedAuditRecord>,
 }
 
 impl AuditRecordCorrelator {
@@ -59,7 +59,7 @@ impl AuditRecordCorrelator {
         }
     }
 
-    fn correlate_records(record_buffer: Vec<AuditRecord>) -> Vec<AuditEvent> {
+    fn correlate_records(record_buffer: Vec<ParsedAuditRecord>) -> Vec<AuditEvent> {
         todo!();
         // let event_buffer;
         // for (record in record_buffer){

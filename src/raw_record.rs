@@ -19,14 +19,14 @@
 use std::{collections::HashMap, time::SystemTime};
 
 #[derive(Debug, PartialEq)]
-pub struct AuditRecord {
+pub struct RawAuditRecord {
     pub record_type: RecordType,
     pub data: String,
 }
 
-impl AuditRecord {
+impl RawAuditRecord {
     pub fn new(_type: RecordType, data: String) -> Self {
-        AuditRecord {
+        RawAuditRecord {
             record_type: _type,
             data,
         }
