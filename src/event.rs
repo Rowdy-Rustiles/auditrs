@@ -1,5 +1,5 @@
-use std::time::SystemTime;
 use crate::parsed_record::ParsedAuditRecord;
+use std::time::SystemTime;
 
 pub struct AuditEvent {
     // Identifier will be Seconds.Milliseconds:Serial
@@ -17,28 +17,28 @@ impl AuditEvent {
             records: vec![record],
         }
     }
-    
+
     // pub fn new_compound(records: Vec<AuditRecord>) -> Result<Self, ValidationError> {
     //     // Unsure if this validation should be done here... might be the correlators job?
     //     if records.is_empty() {
     //         return Err(ValidationError::EmptyRecords);
     //     }
-        
+
     //     // Get reference values from first record
     //     let first = &records[0];
     //     // let expected_timestamp = first.timestamp;
     //     // let expected_serial = first.serial;
-        
+
     //     // Validate all records have matching correlation fields
     //     for record in &records {
-        
+
     //         if record.timestamp != expected_timestamp {
     //             return Err(ValidationError::TimestampMismatch {
     //                 expected: expected_timestamp,
     //                 found: record.timestamp,
     //             });
     //         }
-            
+
     //         if record.serial != expected_serial {
     //             return Err(ValidationError::SerialMismatch {
     //                 expected: expected_serial,
@@ -46,7 +46,7 @@ impl AuditEvent {
     //             });
     //         }
     //     }
-        
+
     //     Ok(AuditEvent {
     //         timestamp: expected_timestamp,
     //         serial: expected_serial,
@@ -66,6 +66,12 @@ impl AuditEvent {
 
 pub enum ValidationError {
     EmptyRecords,
-    TimestampMismatch { expected: SystemTime, found: SystemTime },
-    SerialMismatch { expected: u64, found: u64 },
+    TimestampMismatch {
+        expected: SystemTime,
+        found: SystemTime,
+    },
+    SerialMismatch {
+        expected: u64,
+        found: u64,
+    },
 }

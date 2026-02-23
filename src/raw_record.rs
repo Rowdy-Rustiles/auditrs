@@ -16,9 +16,8 @@
     and additionally find more modern types
 */
 
-use std::{collections::HashMap, time::SystemTime};
 use crate::audit_types::RecordType;
-
+use std::{collections::HashMap, time::SystemTime};
 
 #[derive(Debug, PartialEq)]
 pub struct RawAuditRecord {

@@ -1,7 +1,7 @@
 // Audit record parsing. Converts raw socket data into a parsed AuditRecord
 
-use crate::raw_record::*;
 use crate::parsed_record::*;
+use crate::raw_record::*;
 
 pub struct AuditMessageParser;
 

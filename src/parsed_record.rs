@@ -1,23 +1,34 @@
 use std::{collections::HashMap, time::SystemTime};
 
-use crate::{audit_types::RecordType, raw_record::RawAuditRecord, utils::timestamp_string_to_systemtime};
+use crate::{
+    audit_types::RecordType, raw_record::RawAuditRecord, utils::timestamp_string_to_systemtime,
+};
 
 pub struct ParsedAuditRecord {
     record_type: RecordType,
     timestamp: SystemTime,
     serial: u16,
-    fields: HashMap<String, String>
+    fields: HashMap<String, String>,
 }
 
 impl ParsedAuditRecord {
     pub fn to_log(&self) -> String {
         let field_data = self.data.clone();
         let mut output = String::new();
-        if(!self.data.is_empty()) {
-            output = format!("type_id={} type={} msg={}", u16::from(self.record_type), self.record_type.as_audit_str(), self.data);
+        if (!self.data.is_empty()) {
+            output = format!(
+                "type_id={} type={} msg={}",
+                u16::from(self.record_type),
+                self.record_type.as_audit_str(),
+                self.data
+            );
         } else {
-            output = format!("type_id={} type={}", u16::from(self.record_type), self.record_type.as_audit_str());
-        }   
+            output = format!(
+                "type_id={} type={}",
+                u16::from(self.record_type),
+                self.record_type.as_audit_str()
+            );
+        }
         output
     }
 }
@@ -39,9 +50,7 @@ impl From<RawAuditRecord> for ParsedAuditRecord {
             .map(|(ts, _)| ts);
 
         let timestamp: SystemTime = match timestamp_str {
-            Some(ts_string) => {
-                timestamp_string_to_systemtime(ts_string)?
-            }
+            Some(ts_string) => timestamp_string_to_systemtime(ts_string)?,
             None => {
                 return Err("Error parsing record timestamp!".into());
             }
@@ -74,6 +83,11 @@ impl From<RawAuditRecord> for ParsedAuditRecord {
         // These should be further qualified, but for now we return an empty hashmap
         let fields = HashMap::<String, String>::new();
 
-        ParsedAuditRecord { record_type, timestamp, serial, fields }
+        ParsedAuditRecord {
+            record_type,
+            timestamp,
+            serial,
+            fields,
+        }
     }
 }

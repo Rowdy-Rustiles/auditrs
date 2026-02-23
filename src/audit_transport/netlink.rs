@@ -1,6 +1,5 @@
-
 use super::AuditTransport;
-use crate::{raw_record::RawAuditRecord, audit_types::RecordType};
+use crate::{audit_types::RecordType, raw_record::RawAuditRecord};
 use audit::packet::AuditMessage;
 use futures::stream::StreamExt;
 use netlink_packet_core::NetlinkPayload;

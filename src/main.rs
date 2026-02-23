@@ -1,22 +1,17 @@
 use auditrs::correlator::AuditRecordCorrelator;
-use auditrs::raw_record::RawAuditRecord;
 use auditrs::parser::AuditMessageParser;
+use auditrs::raw_record::RawAuditRecord;
 use auditrs::writer::AuditLogWriter;
 use auditrs::{audit_transport::*, correlator};
 use std::sync::Arc;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
-use tokio::sync::{mpsc, Mutex};
 use tokio::signal;
+use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
 
 use auditrs::{
-    event::*,
-    raw_record::*,
+    audit_transport::*, correlator::*, event::*, parsed_record::*, parser::*, raw_record::*,
     writer::*,
-    parser::*,
-    correlator::*,
-    audit_transport::*,
-    parsed_record::*,
 };
 
 #[tokio::main]
@@ -68,8 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn spawn_transport_task(
-    transport: Arc<Mutex<NetlinkAuditTransport>>, 
-    sender: mpsc::Sender<RawAuditRecord>
+    transport: Arc<Mutex<NetlinkAuditTransport>>,
+    sender: mpsc::Sender<RawAuditRecord>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -96,7 +91,7 @@ fn spawn_transport_task(
 fn spawn_parser_task(
     parser: Arc<Mutex<AuditMessageParser>>,
     mut receiver: mpsc::Receiver<RawAuditRecord>,
-    sender: mpsc::Sender<ParsedAuditRecord>
+    sender: mpsc::Sender<ParsedAuditRecord>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -109,7 +104,7 @@ fn spawn_parser_task(
 fn spawn_correlator_task(
     correlator: Arc<Mutex<AuditRecordCorrelator>>,
     mut receiver: mpsc::Receiver<ParsedAuditRecord>,
-    sender: mpsc::Sender<AuditEvent>
+    sender: mpsc::Sender<AuditEvent>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -121,7 +116,7 @@ fn spawn_correlator_task(
 
 fn spawn_writer_task(
     writer: Arc<Mutex<AuditLogWriter>>,
-    mut receiver: mpsc::Receiver<AuditEvent>
+    mut receiver: mpsc::Receiver<AuditEvent>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {

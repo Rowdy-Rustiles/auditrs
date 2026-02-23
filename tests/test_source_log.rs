@@ -14,12 +14,9 @@ We may benefit from creating a common helper function file for the tests.
 
 */
 
-
 /// Deserializes test-source.log into a list of netlink audit messages.
 /// Returns an error if the an error occurs at any point in the process.
-pub fn deserialize_source_log(
-    path: &Path,
-) -> Result<Vec<NetlinkMessage<AuditMessage>>, String> {
+pub fn deserialize_source_log(path: &Path) -> Result<Vec<NetlinkMessage<AuditMessage>>, String> {
     let file = std::io::BufReader::new(
         std::fs::File::open(path).map_err(|e| format!("open {}: {}", path.display(), e))?,
     );
@@ -161,7 +158,10 @@ fn test_print_reconstructed_messages() {
         println!("{}\n", s);
     }
     println!("--- End ({} messages) ---", readable.len());
-    assert!(!readable.is_empty(), "should have at least one message to print");
+    assert!(
+        !readable.is_empty(),
+        "should have at least one message to print"
+    );
 }
 
 #[test]
@@ -171,12 +171,27 @@ fn test_deserialize_source_log_helper() {
         return;
     }
     let messages = deserialize_source_log(&path).expect("deserialize_source_log should succeed");
-    assert!(!messages.is_empty(), "helper should return at least one message");
+    assert!(
+        !messages.is_empty(),
+        "helper should return at least one message"
+    );
     for (i, msg) in messages.iter().enumerate() {
-        assert!(msg.header.length >= 16, "message {} has valid netlink header length", i + 1);
+        assert!(
+            msg.header.length >= 16,
+            "message {} has valid netlink header length",
+            i + 1
+        );
         let readable = message_to_readable(msg);
-        assert!(readable.contains("type="), "readable form for message {} includes type", i + 1);
-        assert!(readable.contains("payload="), "readable form for message {} includes payload", i + 1);
+        assert!(
+            readable.contains("type="),
+            "readable form for message {} includes type",
+            i + 1
+        );
+        assert!(
+            readable.contains("payload="),
+            "readable form for message {} includes payload",
+            i + 1
+        );
     }
 }
 
