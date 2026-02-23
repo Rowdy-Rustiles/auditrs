@@ -5,13 +5,19 @@ use auditrs::writer::AuditLogWriter;
 use auditrs::{audit_transport::*, correlator};
 use std::sync::Arc;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
+use tokio::sync::{mpsc, Mutex};
 use tokio::signal;
-use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
 
-// Type alias allow us to write our data pipeline with informative names without worrying over what the types actually look like.
-type ParsedAuditMessage = (); // todo; record.rs
-type CorrelatedEvent = (); // todo; event.rs
+use auditrs::{
+    event::*,
+    raw_record::*,
+    writer::*,
+    parser::*,
+    correlator::*,
+    audit_transport::*,
+    parsed_record::*,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -62,8 +68,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn spawn_transport_task(
-    transport: Arc<Mutex<NetlinkAuditTransport>>,
-    sender: mpsc::Sender<RawAuditEvent>,
+    transport: Arc<Mutex<NetlinkAuditTransport>>, 
+    sender: mpsc::Sender<RawAuditRecord>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -89,8 +95,8 @@ fn spawn_transport_task(
 
 fn spawn_parser_task(
     parser: Arc<Mutex<AuditMessageParser>>,
-    mut receiver: mpsc::Receiver<RawAuditEvent>,
-    sender: mpsc::Sender<ParsedAuditMessage>,
+    mut receiver: mpsc::Receiver<RawAuditRecord>,
+    sender: mpsc::Sender<ParsedAuditRecord>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -102,8 +108,8 @@ fn spawn_parser_task(
 
 fn spawn_correlator_task(
     correlator: Arc<Mutex<AuditRecordCorrelator>>,
-    mut receiver: mpsc::Receiver<ParsedAuditMessage>,
-    sender: mpsc::Sender<CorrelatedEvent>,
+    mut receiver: mpsc::Receiver<ParsedAuditRecord>,
+    sender: mpsc::Sender<AuditEvent>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -115,7 +121,7 @@ fn spawn_correlator_task(
 
 fn spawn_writer_task(
     writer: Arc<Mutex<AuditLogWriter>>,
-    mut receiver: mpsc::Receiver<CorrelatedEvent>,
+    mut receiver: mpsc::Receiver<AuditEvent>
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
