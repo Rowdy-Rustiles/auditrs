@@ -22,44 +22,20 @@ use crate::audit_types::RecordType;
 
 #[derive(Debug, PartialEq)]
 pub struct RawAuditRecord {
-    pub record_type: RecordType,
+    pub record_id: u16,
     pub data: String,
 }
 
 impl RawAuditRecord {
-    pub fn new(_type: RecordType, data: String) -> Self {
+    pub fn new(id: u16, data: String) -> Self {
         RawAuditRecord {
-            record_type: _type,
+            record_id: id,
             data,
         }
-    }
-
-    pub fn to_log(&self) -> String {
-        let field_data = self.data.clone();
-        let mut output = String::new();
-        if(!self.data.is_empty()) {
-            output = format!("type_id={} type={} msg={}", u16::from(self.record_type), self.record_type.as_audit_str(), self.data);
-        } else {
-            output = format!("type_id={} type={}", u16::from(self.record_type), self.record_type.as_audit_str());
-        }   
-        output
     }
 }
 
 #[cfg(test)]
 pub mod test {
     use super::*;
-
-    #[test]
-    fn test_record_to_log() {
-        let record_type = RecordType::from(1300); // Syscall
-        let record = AuditRecord::new(record_type, "example data".to_string());
-        assert_eq!(record.record_type.as_audit_str(), "SYSCALL");
-        assert_eq!(record.to_log(), "type=SYSCALL msg=example data");
-
-        // Round-trip u16 conversion
-        let num: u16 = record_type.into();
-        assert_eq!(num, 1300);
-        assert_eq!(RecordType::from(num), record_type);
-    }
 }

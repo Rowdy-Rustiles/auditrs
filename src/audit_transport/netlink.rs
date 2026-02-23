@@ -62,14 +62,12 @@ async fn netlink_listener_task(
                 let (_, kvs) = event;
                 let data = kvs.to_string();
 
-                // Convert message type to RawEventType
-                let record_type = RawEventType::from(msg.header.message_type);
-
                 // Create RawAuditRecord
-                let raw_event = RawAuditRecord::new(record_type, data);
+                let record_id = msg.header.message_type;
+                let raw_record = RawAuditRecord::new(record_id, data);
 
                 // Send event through channel
-                if sender.send(raw_event).await.is_err() {
+                if sender.send(raw_record).await.is_err() {
                     break; // Channel closed
                 }
             }
