@@ -1,69 +1,71 @@
-/* Combine multiple ParsedAuditRecords into a singular AuditEvent
-
-   https://man7.org/linux/man-pages/man5/auditd.conf.5.html
-   ^ Refer to Notes section:
-
-   Auditd events are made up of one or more records. The auditd
-       system cannot guarantee that the set of records that make up an
-       event will occur atomically, that is the stream will have
-       interleaved records of different events, IE
-
-              event0_record0
-              event1_record0
-              event2_record0
-              event1_record3
-              event2_record1
-              event1_record4
-              event3_record0
-
-       The auditd system does not guarantee that the records that make up
-       an event will appear in order. Thus, when processing event
-       streams, we need to maintain a list of events with their own list
-       of records hence List of List (LOL) event processing.
-
-       When processing an event stream we define the end of an event via
-
-              record type = AUDIT_EOE (audit end of event type record),
-              or
-              record type = AUDIT_PROCTITLE (we note the AUDIT_PROCTITLE
-              is always the last record), or
-              record type = AUDIT_KERNEL (kernel events are one record
-              events), or
-              record type < AUDIT_FIRST_EVENT (only single record events
-              appear before this type), or
-              record type >= AUDIT_FIRST_ANOM_MSG (only single record
-              events appear after this type), or
-              record type >= AUDIT_MAC_UNLBL_ALLOW && record type <=
-              AUDIT_MAC_CALIPSO_DEL (these are also one record events),
-              or
-              for the stream being processed, the time of the event is
-              over end_of_event_timeout seconds old.
- */
-
 use std::time::SystemTime;
 use crate::parsed_record::ParsedAuditRecord;
-use crate::event::AuditEvent;
 
-pub struct AuditRecordCorrelator {
-    curr_timestamp: SystemTime,
-    curr_serial: u16,
-    curr_records: Vec<ParsedAuditRecord>,
+pub struct AuditEvent {
+    // Identifier will be Seconds.Milliseconds:Serial
+
+    // pub timestamp: SystemTime,
+    // pub serial: u64,
+    pub records: Vec<ParsedAuditRecord>,
 }
 
-impl AuditRecordCorrelator {
-    pub fn new() -> Self {
+impl AuditEvent {
+    pub fn new_simple(record: ParsedAuditRecord) -> Self {
         Self {
-            curr_timestamp: SystemTime::UNIX_EPOCH,
-            curr_serial: 0,
-            curr_records: Vec::new()
+            // timestamp: record.timestamp,
+            // serial: record.serial,
+            records: vec![record],
         }
     }
+    
+    // pub fn new_compound(records: Vec<AuditRecord>) -> Result<Self, ValidationError> {
+    //     // Unsure if this validation should be done here... might be the correlators job?
+    //     if records.is_empty() {
+    //         return Err(ValidationError::EmptyRecords);
+    //     }
+        
+    //     // Get reference values from first record
+    //     let first = &records[0];
+    //     // let expected_timestamp = first.timestamp;
+    //     // let expected_serial = first.serial;
+        
+    //     // Validate all records have matching correlation fields
+    //     for record in &records {
+        
+    //         if record.timestamp != expected_timestamp {
+    //             return Err(ValidationError::TimestampMismatch {
+    //                 expected: expected_timestamp,
+    //                 found: record.timestamp,
+    //             });
+    //         }
+            
+    //         if record.serial != expected_serial {
+    //             return Err(ValidationError::SerialMismatch {
+    //                 expected: expected_serial,
+    //                 found: record.serial,
+    //             });
+    //         }
+    //     }
+        
+    //     Ok(AuditEvent {
+    //         timestamp: expected_timestamp,
+    //         serial: expected_serial,
+    //         records,
+    //     })
+    // }
 
-    fn correlate_records(record_buffer: Vec<ParsedAuditRecord>) -> Vec<AuditEvent> {
-        todo!();
-        // let event_buffer;
-        // for (record in record_buffer){
-           
-        // }
+    pub fn is_simple(self) -> bool {
+        assert!(!self.records.is_empty());
+        self.records.len() == 1
     }
+
+    pub fn is_compound(self) -> bool {
+        self.records.len() > 1
+    }
+}
+
+pub enum ValidationError {
+    EmptyRecords,
+    TimestampMismatch { expected: SystemTime, found: SystemTime },
+    SerialMismatch { expected: u64, found: u64 },
 }
