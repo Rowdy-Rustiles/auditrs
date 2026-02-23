@@ -12,7 +12,7 @@ pub struct ParsedAuditRecord {
 }
 
 impl ParsedAuditRecord {
-    pub fn to_log(&self) -> String {
+    pub fn to_legacy_log(&self) -> String {
         let field_data = self.data.clone();
         let mut output = String::new();
         if (!self.data.is_empty()) {
