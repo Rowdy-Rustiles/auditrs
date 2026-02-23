@@ -1118,7 +1118,7 @@ pub mod test {
     #[test]
     fn test_record_to_log() {
         let record_type = RecordType::from(1300); // Syscall
-        let record = AuditRecord::new(record_type, "example data".to_string());
+        let record = RawAuditRecord::new(record_type, "example data".to_string());
         assert_eq!(record.record_type.as_audit_str(), "SYSCALL");
         assert_eq!(record.to_log(), "type=SYSCALL msg=example data");
 

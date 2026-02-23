@@ -31,7 +31,7 @@ pub fn deserialize_source_log(
             continue;
         }
         let bytes = hex_decode(line).map_err(|e| format!("line {}: {}", i + 1, e))?;
-        let msg = NetlinkMessage::<AuditMessage>::deserialize(&bytes)
+        let msg = 
             .map_err(|e| format!("line {} deserialize: {}", i + 1, e))?;
         messages.push(msg);
     }
