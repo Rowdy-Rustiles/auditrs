@@ -5,3 +5,4 @@ pub mod parser;
 pub mod correlator;
 pub mod writer;
 pub mod audit_transport;
+pub mod audit_types;

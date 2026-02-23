@@ -1,5 +1,5 @@
 use auditrs::correlator::AuditRecordCorrelator;
-use auditrs::event::RawAuditEvent;
+use auditrs::raw_record::RawAuditRecord;
 use auditrs::parser::AuditMessageParser;
 use auditrs::writer::AuditLogWriter;
 use auditrs::{audit_transport::*, correlator};

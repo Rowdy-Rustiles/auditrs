@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::SystemTime};
 
-use crate::raw_record::RecordType;
+use crate::audit_types::RecordType;
 
 pub struct ParsedAuditRecord {
     record_type: RecordType, //  is this the same RecordType?

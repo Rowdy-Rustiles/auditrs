@@ -1,13 +1,13 @@
 
 use super::AuditTransport;
-use crate::raw_record::{RawAuditRecord, RawEventType};
+use crate::{raw_record::RawAuditRecord, audit_types::RecordType};
 use audit::packet::AuditMessage;
 use futures::stream::StreamExt;
 use netlink_packet_core::NetlinkPayload;
 use tokio::sync::mpsc;
 
 pub struct NetlinkAuditTransport {
-    receiver: mpsc::Receiver<RawAuditEvent>,
+    receiver: mpsc::Receiver<RawAuditRecord>,
 }
 
 impl AuditTransport for NetlinkAuditTransport {
@@ -31,14 +31,14 @@ impl AuditTransport for NetlinkAuditTransport {
 }
 
 impl NetlinkAuditTransport {
-    /// Async method to receive the next RawAuditEvent
-    pub async fn recv(&mut self) -> Option<RawAuditEvent> {
+    /// Async method to receive the next RawAuditRecord
+    pub async fn recv(&mut self) -> Option<RawAuditRecord> {
         self.receiver.recv().await
     }
 }
 
 async fn netlink_listener_task(
-    sender: mpsc::Sender<RawAuditEvent>,
+    sender: mpsc::Sender<RawAuditRecord>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create netlink socket connection
     let (connection, mut handle, mut messages) =
@@ -65,8 +65,8 @@ async fn netlink_listener_task(
                 // Convert message type to RawEventType
                 let record_type = RawEventType::from(msg.header.message_type);
 
-                // Create RawAuditEvent
-                let raw_event = RawAuditEvent::new(record_type, data);
+                // Create RawAuditRecord
+                let raw_event = RawAuditRecord::new(record_type, data);
 
                 // Send event through channel
                 if sender.send(raw_event).await.is_err() {
