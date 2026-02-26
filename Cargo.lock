@@ -83,9 +83,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c27c7217cb24a7bc751d53503f22f4e0bdb78abe6e220d53256342db52c97cb1"
 dependencies = [
  "futures",
- "netlink-packet-audit 0.5.1",
- "netlink-packet-core 0.7.0",
- "netlink-proto 0.11.5",
+ "netlink-packet-audit",
+ "netlink-packet-core",
+ "netlink-proto",
  "thiserror 1.0.69",
 ]
 
@@ -98,9 +98,7 @@ dependencies = [
  "env_logger",
  "futures",
  "libc",
- "netlink-packet-audit 0.6.1",
- "netlink-packet-core 0.7.0",
- "netlink-proto 0.11.5",
+ "netlink-packet-core",
  "strum",
  "strum_macros",
  "tokio",
@@ -422,21 +420,9 @@ dependencies = [
  "byteorder",
  "bytes",
  "log",
- "netlink-packet-core 0.7.0",
+ "netlink-packet-core",
  "netlink-packet-utils",
- "netlink-proto 0.11.5",
-]
-
-[[package]]
-name = "netlink-packet-audit"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca9e80389b423ef073a74f393a57c37ffef7bcf058212c233412f19a026109b8"
-dependencies = [
- "bytes",
- "log",
- "netlink-packet-core 0.8.1",
- "netlink-proto 0.12.0",
+ "netlink-proto",
 ]
 
 [[package]]
@@ -448,15 +434,6 @@ dependencies = [
  "anyhow",
  "byteorder",
  "netlink-packet-utils",
-]
-
-[[package]]
-name = "netlink-packet-core"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3463cbb78394cb0141e2c926b93fc2197e473394b761986eca3b9da2c63ae0f4"
-dependencies = [
- "paste",
 ]
 
 [[package]]
@@ -480,21 +457,7 @@ dependencies = [
  "bytes",
  "futures",
  "log",
- "netlink-packet-core 0.7.0",
- "netlink-sys",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "netlink-proto"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b65d130ee111430e47eed7896ea43ca693c387f097dd97376bffafbf25812128"
-dependencies = [
- "bytes",
- "futures",
- "log",
- "netlink-packet-core 0.8.1",
+ "netlink-packet-core",
  "netlink-sys",
  "thiserror 2.0.18",
 ]
