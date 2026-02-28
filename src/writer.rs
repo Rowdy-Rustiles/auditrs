@@ -1,4 +1,4 @@
-use crate::event::AuditEvent;
+use crate::correlator::AuditEvent;
 
 pub struct AuditLogWriter {
     output_format: OutputFormat,

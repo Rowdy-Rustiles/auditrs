@@ -21,6 +21,11 @@ pub struct ParsedAuditRecord {
 /// I think splitting most of the logic between From<> and
 /// some static functions is a good, simple approach
 impl ParsedAuditRecord {
+    /// Returns (timestamp, serial) identifying the audit event this record belongs to.
+    pub fn identifier(&self) -> (SystemTime, u16) {
+        (self.timestamp, self.serial)
+    }
+
     /// This should ultimately be moved to another file
     pub fn to_legacy_log(&self) -> String {
         let field_data = self.fields.clone();
