@@ -57,22 +57,22 @@ async fn main() -> Result<(), String> {
 
 fn handle_message(msg: NetlinkMessage<AuditMessage>, output_settings: &OutputSettings) -> Result<(), String> {
     // NetlinkMessage
-    append_to_file(output_settings.netlink_message_path.clone(), &format!("{:?}", msg))?;
+    append_to_file(output_settings.netlink_message_path.clone(), &format!("{:?}\n", msg))?;
     append_to_file(output_settings.conglomerate_path.clone(), &format!("NetlinkMessage: {:?}\n", msg))?;
 
     // NetlinkPayload
-    append_to_file(output_settings.netlink_payload_path.clone(), &format!("{:?}", msg.payload))?;
+    append_to_file(output_settings.netlink_payload_path.clone(), &format!("{:?}\n", msg.payload))?;
     append_to_file(output_settings.conglomerate_path.clone(), &format!("NetlinkPayload: {:?}\n", msg.payload))?;
 
     // AuditMessage
     if let NetlinkPayload::InnerMessage(audit_msg) = &msg.payload {
-        append_to_file(output_settings.audit_message_path.clone(), &format!("{:?}", audit_msg))?;
+        append_to_file(output_settings.audit_message_path.clone(), &format!("{:?}\n", audit_msg))?;
         append_to_file(output_settings.conglomerate_path.clone(), &format!("AuditMessage: {:?}\n", audit_msg))?;
     }
 
     // RawAuditRecord
     if let NetlinkPayload::InnerMessage(AuditMessage::Event(raw_audit)) = &msg.payload {
-        append_to_file(output_settings.raw_audit_record_path.clone(), &format!("{:?}", raw_audit))?;
+        append_to_file(output_settings.raw_audit_record_path.clone(), &format!("{:?}\n", raw_audit))?;
         append_to_file(output_settings.conglomerate_path.clone(), &format!("RawAuditRecord: {:?}\n", raw_audit))?;
     }
 
@@ -84,9 +84,12 @@ fn handle_message(msg: NetlinkMessage<AuditMessage>, output_settings: &OutputSet
         };
         let parsed_record = ParsedAuditRecord::try_from(raw_audit)
             .map_err(|e| format!("Failed to parse RawAuditRecord: {}", e))?;
-        append_to_file(output_settings.parsed_audit_record_path.clone(), &format!("{:?}", parsed_record))?;
+        append_to_file(output_settings.parsed_audit_record_path.clone(), &format!("{:?}\n", parsed_record))?;
         append_to_file(output_settings.conglomerate_path.clone(), &format!("ParsedAuditRecord: {:?}\n", parsed_record))?;
     }
+
+    // Place a delimeter after each message for readability in the conglomerate log
+    append_to_file(output_settings.conglomerate_path.clone(), "-----------------------------\n")?;
 
     Ok(())
 }
