@@ -2,14 +2,15 @@
 This is a simple binary that captures audit messages and logs them to files in various stages of processing. 
 The output settings can be configured in the OutputSettings struct, which controls what gets logged and where.
 */
-
 use audit::new_connection;
 use auditrs::parsed_record::ParsedAuditRecord;
 use auditrs::raw_record::RawAuditRecord;
 use futures::stream::StreamExt;
 use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
 use audit::packet::{AuditMessage};
-
+use std::path::Path;
+use std::fs::{self, OpenOptions};
+use std::io::{Write, Result as IoResult};
 
 #[derive(Clone)]
 struct OutputSettings {
@@ -23,11 +24,12 @@ struct OutputSettings {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-
     let current_time = chrono::Utc::now().format("%Y%m%d%H%M%S").to_string();
+    
+    // Ensure output directory exists
+    fs::create_dir_all("output").map_err(|e| format!("Failed to create output directory: {}", e))?;
 
     // Change this to control what gets logged to a file.
-    
     let output_settings = OutputSettings {
         netlink_message_path: Some(format!("output/netlink_message_{}.log", current_time)),
         netlink_payload_path: Some(format!("output/netlink_payload_{}.log", current_time)),
@@ -35,7 +37,6 @@ async fn main() -> Result<(), String> {
         raw_audit_record_path: Some(format!("output/raw_audit_record_{}.log", current_time)),
         parsed_audit_record_path: Some(format!("output/parsed_audit_record_{}.log", current_time)),
         conglomerate_path: Some(format!("output/conglomerate_{}.log", current_time)),
-
     };
 
     let (connection, mut handle, mut messages) =
@@ -46,60 +47,74 @@ async fn main() -> Result<(), String> {
 
     env_logger::init();
     while let Some((msg, _)) = messages.next().await {
-        handle_message(msg, output_settings.clone());
+        println!("Received message: {:?}\n", msg);
+        if let Err(e) = handle_message(msg, &output_settings) {
+            eprintln!("Error handling message: {}", e);
+        }
     }
     Ok(())
 }
 
-fn handle_message(msg: NetlinkMessage<AuditMessage>, output_settings: OutputSettings) {
+fn handle_message(msg: NetlinkMessage<AuditMessage>, output_settings: &OutputSettings) -> Result<(), String> {
+    // NetlinkMessage
+    append_to_file(output_settings.netlink_message_path.clone(), &format!("{:?}", msg))?;
+    append_to_file(output_settings.conglomerate_path.clone(), &format!("NetlinkMessage: {:?}\n", msg))?;
 
-    if let Some(path) = output_settings.netlink_message_path {
-        std::fs::write(path, format!("{:?}", msg)).unwrap();
-        std::fs::write(
-            output_settings.conglomerate_path.clone().unwrap(),
-            format!("NetlinkMessage: {:?}\n", msg),
-        ).unwrap();
+    // NetlinkPayload
+    append_to_file(output_settings.netlink_payload_path.clone(), &format!("{:?}", msg.payload))?;
+    append_to_file(output_settings.conglomerate_path.clone(), &format!("NetlinkPayload: {:?}\n", msg.payload))?;
+
+    // AuditMessage
+    if let NetlinkPayload::InnerMessage(audit_msg) = &msg.payload {
+        append_to_file(output_settings.audit_message_path.clone(), &format!("{:?}", audit_msg))?;
+        append_to_file(output_settings.conglomerate_path.clone(), &format!("AuditMessage: {:?}\n", audit_msg))?;
     }
-    if let Some(path) = output_settings.netlink_payload_path {
-        std::fs::write(path, format!("{:?}", msg.payload.clone())).unwrap();
-        std::fs::write(
-            output_settings.conglomerate_path.clone().unwrap(),
-            format!("NetlinkPayload: {:?}\n", msg.payload.clone()),
-        ).unwrap();
+
+    // RawAuditRecord
+    if let NetlinkPayload::InnerMessage(AuditMessage::Event(raw_audit)) = &msg.payload {
+        append_to_file(output_settings.raw_audit_record_path.clone(), &format!("{:?}", raw_audit))?;
+        append_to_file(output_settings.conglomerate_path.clone(), &format!("RawAuditRecord: {:?}\n", raw_audit))?;
     }
-    if let Some(path) = output_settings.audit_message_path
-        && let NetlinkPayload::InnerMessage(audit_msg) = &msg.payload {
-            std::fs::write(path, format!("{:?}", audit_msg.clone())).unwrap();
-            std::fs::write(
-                output_settings.conglomerate_path.clone().unwrap(),
-                format!("AuditMessage: {:?}\n", audit_msg.clone()),
-            ).unwrap();
-        }
-    if let Some(path) = output_settings.raw_audit_record_path
-        && let &NetlinkPayload::InnerMessage(AuditMessage::Event(ref raw_audit)) = &msg.payload {
-            std::fs::write(path, format!("{:?}", raw_audit)).unwrap();
-            std::fs::write(
-                output_settings.conglomerate_path.clone().unwrap(),
-                format!("RawAuditRecord: {:?}\n", raw_audit),
-            ).unwrap();
-        }
-    if let Some(path) = output_settings.parsed_audit_record_path 
-        && let NetlinkPayload::InnerMessage(AuditMessage::Event(raw_audit)) = msg.payload {
-            // this is stupid. we should make a from impl or tryfrom impl. or maybe combine the type?
-            // raw_audit_record is the same as AuditMessage::Event. both are eq. to (u16, String).
-            let raw_audit = RawAuditRecord {
-                record_id: raw_audit.0,
-                data: raw_audit.1,
-            };
-            match ParsedAuditRecord::try_from(raw_audit) {
-                Ok(parsed_record) => {
-                    std::fs::write(path, format!("{:?}", parsed_record)).unwrap();
-                    std::fs::write(
-                        output_settings.conglomerate_path.clone().unwrap(),
-                        format!("ParsedAuditRecord: {:?}\n", parsed_record),
-                    ).unwrap();
-                },
-                Err(e) => eprintln!("Failed to parse audit message: {:?}", e),
-            }
+
+    // ParsedAuditRecord
+    if let NetlinkPayload::InnerMessage(AuditMessage::Event(raw_audit)) = &msg.payload {
+        let raw_audit = RawAuditRecord {
+            record_id: raw_audit.0,
+            data: raw_audit.1.clone(),
+        };
+        let parsed_record = ParsedAuditRecord::try_from(raw_audit)
+            .map_err(|e| format!("Failed to parse RawAuditRecord: {}", e))?;
+        append_to_file(output_settings.parsed_audit_record_path.clone(), &format!("{:?}", parsed_record))?;
+        append_to_file(output_settings.conglomerate_path.clone(), &format!("ParsedAuditRecord: {:?}\n", parsed_record))?;
     }
+
+    Ok(())
+}
+
+
+// Append content to a file, creating the file if it doesn't exist.
+// Takes in an option just to make calling code cleaner - if the path is None, it does nothing.
+fn append_to_file(path: Option<String>, content: &str) -> Result<(), String> {
+    if let Some(path) = path {
+        ensure_parent_dir(&path)?;
+    
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .map_err(|e| format!("Failed to open {} for appending: {}", path, e))?;
+            
+        file.write(content.as_bytes())
+            .map_err(|e| format!("Failed to append to {}: {}", path, e))?;
+    }
+    Ok(())
+}
+
+// Ensure the parent directory of a file exists
+fn ensure_parent_dir(file_path: &str) -> Result<(), String> {
+    if let Some(parent) = Path::new(file_path).parent() && !parent.exists() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
+    }
+    Ok(())
 }
