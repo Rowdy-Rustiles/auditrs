@@ -57,18 +57,17 @@ async fn netlink_listener_task(
     // Process events from the Linux kernel audit subsystem
     while let Some((msg, _addr)) = messages.next().await {
         if let NetlinkPayload::InnerMessage(inner) = &msg.payload {
-            if let AuditMessage::Event(event) = inner {
-                let (_, kvs) = event;
-                let data = kvs.to_string();
+            let data = match inner {
+                AuditMessage::Event((_, kvs)) => kvs.to_string(),
+                AuditMessage::Other((_, data)) => data.clone(),
+                _ => continue,
+            };
 
-                // Create RawAuditRecord
-                let record_id = msg.header.message_type;
-                let raw_record = RawAuditRecord::new(record_id, data);
+            let record_id = msg.header.message_type;
+            let raw_record = RawAuditRecord::new(record_id, data);
 
-                // Send event through channel
-                if sender.send(raw_record).await.is_err() {
-                    break; // Channel closed    
-                }
+            if sender.send(raw_record).await.is_err() {
+                break; // Channel closed
             }
         }
     }

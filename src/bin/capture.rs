@@ -77,12 +77,17 @@ fn handle_message(msg: NetlinkMessage<AuditMessage>, output_settings: &OutputSet
     }
 
     // ParsedAuditRecord
-    if let NetlinkPayload::InnerMessage(AuditMessage::Event(raw_audit)) = &msg.payload {
-        let raw_audit = RawAuditRecord {
-            record_id: raw_audit.0,
-            data: raw_audit.1.clone(),
-        };
-        let parsed_record = ParsedAuditRecord::try_from(raw_audit)
+   if let NetlinkPayload::InnerMessage(inner) = &msg.payload {
+            // We want to match for both Event and Other enum variants to avoid ignoring potentially useful data.
+            let data = match inner {
+                AuditMessage::Event((_, kvs)) => kvs.to_string(),
+                AuditMessage::Other((_, data)) => data.clone(),
+                _ => return Err(format!("Invalid AuditMessage: {:?}", inner)),
+            };
+
+            let record_id = msg.header.message_type;
+            let raw_record = RawAuditRecord::new(record_id, data);
+            let parsed_record = ParsedAuditRecord::try_from(raw_record)
             .map_err(|e| format!("Failed to parse RawAuditRecord: {}", e))?;
         append_to_file(output_settings.parsed_audit_record_path.clone(), &format!("{:?}\n", parsed_record))?;
         append_to_file(output_settings.conglomerate_path.clone(), &format!("ParsedAuditRecord: {:?}\n", parsed_record))?;

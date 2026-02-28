@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use auditrs::correlator::AuditRecordCorrelator;
+use auditrs::correlator::Correlator;
 use auditrs::parser::AuditMessageParser;
 use auditrs::raw_record::RawAuditRecord;
 use auditrs::writer::AuditLogWriter;
@@ -12,7 +12,7 @@ use tokio::time::sleep;
 
 
 use auditrs::{
-    audit_transport::*, correlator::*, event::*, parsed_record::*, parser::*, raw_record::*,
+    audit_transport::*, correlator::*, parsed_record::*, parser::*, raw_record::*,
     writer::*,
 };
 
@@ -25,8 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
     let parser = Arc::new(Mutex::new(AuditMessageParser::new()));
-    let correlator = Arc::new(Mutex::new(AuditRecordCorrelator::new()));
-    let writer = Arc::new(Mutex::new(AuditLogWriter::new()));
+    let correlator = Arc::new(Mutex::new(Correlator::new()));
+    // let writer = Arc::new(Mutex::new(AuditLogWriter::new()));
     // let rule_manager = Arc::new(Mutex::new(RuleManager::new()));
 
     // Create message channels to link components input/output.
@@ -38,7 +38,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start a task that uses each component, with channels hooked up.
     let parser_task = spawn_parser_task(parser, raw_audit_rx, parsed_audit_tx);
     let correlator_task = spawn_correlator_task(correlator, parsed_audit_rx, correlated_event_tx);
-    let writer_task = spawn_writer_task(writer, correlated_event_rx);
+    let temp_output_task = tokio::spawn(async move {
+        let mut rx = correlated_event_rx;
+        while rx.recv().await.is_some() {
+            // Events already printed by correlator; drain to prevent channel backpressure
+        }
+    });
 
     println!("auditRS started successfully");
     // Only job at this point is maintaining the threads and cancelling them if need be.
@@ -54,10 +59,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Shutting down auditRS");
     parser_task.abort();
     correlator_task.abort();
-    writer_task.abort();
+    temp_output_task.abort();
 
     // Optionally wait for them to finish aborting
-    let _ = tokio::join!(parser_task, correlator_task, writer_task);
+    let _ = tokio::join!(parser_task, correlator_task, temp_output_task);
 
     Ok(())
 }
@@ -68,22 +73,40 @@ fn spawn_parser_task(
     sender: mpsc::Sender<ParsedAuditRecord>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
+        let parser_clone = Arc::clone(&parser);
         loop {
-            println!("Parssssing ~~~");
-            sleep(Duration::from_millis(100)).await;
+            let raw_record = receiver.recv().await;
+            if let Some(raw_record) = raw_record {
+                let parser = parser_clone.lock().await;
+                let parsed_record = ParsedAuditRecord::try_from(raw_record).unwrap();
+                println!("Parsed record: {:?}", parsed_record);
+                sender.send(parsed_record).await.unwrap();
+            }
         }
     })
 }
 
 fn spawn_correlator_task(
-    correlator: Arc<Mutex<AuditRecordCorrelator>>,
+    correlator: Arc<Mutex<Correlator>>,
     mut receiver: mpsc::Receiver<ParsedAuditRecord>,
     sender: mpsc::Sender<AuditEvent>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
-            println!("Correlation!!! woah :o");
-            sleep(Duration::from_millis(100)).await;
+            /// Two async branches are run, the first to succeed will be executed.
+            /// The second branch is executed periodically, every 500ms.
+            tokio::select! {
+                Some(record) = receiver.recv() => {
+                    correlator.lock().await.push(record);
+                }
+                _ = sleep(Duration::from_millis(500)) => {
+                    let mut corr = correlator.lock().await;
+                    for event in corr.flush_expired() {
+                        println!("Correlated event: {:?}", event);
+                        sender.send(event).await.unwrap();
+                    }
+                }
+            }
         }
     })
 }
