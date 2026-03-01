@@ -1,31 +1,93 @@
-use std::{collections::HashMap, time::SystemTime};
-use crate::utils::timestamp_string_to_systemtime;
+use std::collections::HashMap;
+use std::time::SystemTime;
 
+use crate::utils::timestamp_string_to_systemtime;
+use nom::Finish;
 use nom::{
-    bytes::complete::{tag, take_until, take_while1, take_while},
-    character::complete::{char, digit1, alphanumeric1, space0, space1},
-    combinator::{map, opt, recognize},
-    multi::separated_list0,
-    sequence::{delimited, preceded, separated_pair, tuple},
+    bytes::complete::{tag, take_while1, take_while},
+    character::complete::{char, space1},
+    sequence::tuple,
     IResult,
 };
+use crate::netlink::RawAuditRecord;
+use super::{ParsedAuditRecord, RecordData};
 
-pub struct AuditMessageParser {}
 
-impl AuditMessageParser {
-    pub fn new() -> Self {
-        AuditMessageParser {}
+impl ParsedAuditRecord {
+    /// Returns (timestamp, serial) identifying the audit event this record belongs to.
+    pub fn identifier(&self) -> (SystemTime, u16) {
+        (self.timestamp, self.serial)
     }
 }
 
-#[derive(Debug)]
-pub struct RecordData {
-    pub timestamp: SystemTime,
-    pub serial: String,
-    pub fields: HashMap<String, String>,
+impl TryFrom<RawAuditRecord> for ParsedAuditRecord {
+    type Error = anyhow::Error;
+    fn try_from(raw_record: RawAuditRecord) -> Result<Self, Self::Error> {
+        let parse_result = parse_audit_message(&raw_record.data).finish();
+        match parse_result {
+            Ok((_, record_data)) => {
+                let fields = parse_kv(record_data.fields.get("kv").unwrap_or(&String::new()));
+                Ok(ParsedAuditRecord {
+                    record_type: raw_record.record_id.into(),
+                    timestamp: record_data.timestamp,
+                    serial: record_data.serial.parse::<u16>().unwrap_or(0),
+                    fields,
+                })
+            }
+            Err(e) => Err(anyhow::anyhow!("Failed to parse audit message: {:?}", e)),
+        }
+    }
 }
 
-pub fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
+/// Parses the data payload of a RawAuditRecord into a hashmap of key-value pairs.
+fn parse_kv(input: &str) -> HashMap<String, String> {
+    let mut fields = HashMap::new();
+    let mut chars = input.chars().peekable();
+
+    while chars.peek().is_some() {
+        let mut key = String::new();
+        while let Some(&c) = chars.peek() {
+            if c == '=' {
+                chars.next();
+                break;
+            }
+            key.push(c);
+            chars.next();
+        }
+
+        let mut value = String::new();
+        if let Some(&'"') = chars.peek() {
+            chars.next();
+            while let Some(c) = chars.next() {
+                if c == '"' {
+                    break;
+                }
+                value.push(c);
+            }
+        } else {
+            while let Some(&c) = chars.peek() {
+                if c == ' ' {
+                    break;
+                }
+                value.push(c);
+                chars.next();
+            }
+        }
+
+        fields.insert(key.trim().to_string(), value);
+
+        while let Some(&c) = chars.peek() {
+            if !c.is_whitespace() {
+                break;
+            }
+            chars.next();
+        }
+    }
+
+    fields
+}
+
+fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
     // Basic parsers
     let audit_tag = tag("audit(");
     let timestamp_digits = take_while1(|c: char| c.is_ascii_digit());

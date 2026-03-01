@@ -1,5 +1,4 @@
-use super::AuditTransport;
-use crate::raw_record::RawAuditRecord;
+use crate::netlink::RawAuditRecord;
 use audit::packet::AuditMessage;
 use futures::stream::StreamExt;
 use netlink_packet_core::NetlinkPayload;
@@ -9,8 +8,10 @@ pub struct NetlinkAuditTransport {
     receiver: mpsc::Receiver<RawAuditRecord>,
 }
 
-impl AuditTransport for NetlinkAuditTransport {
-    fn new() -> Self {
+
+
+impl NetlinkAuditTransport {
+    pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel(1000);
         tokio::spawn(async move {
             if let Err(e) = netlink_listener_task(sender).await {
@@ -19,20 +20,23 @@ impl AuditTransport for NetlinkAuditTransport {
         });
         Self { receiver }
     }
-    fn read_message(&self) -> Option<Vec<u8>> {
+    fn read_message_inner(&self) -> Option<Vec<u8>> {
         None
     }
-    fn into_receiver(self) -> mpsc::Receiver<RawAuditRecord> {
+    pub fn into_receiver(self) -> mpsc::Receiver<RawAuditRecord> {
         self.receiver
     }
-    async fn recv(&mut self) -> Option<RawAuditRecord> {
+    fn into_receiver_inner(self) -> mpsc::Receiver<RawAuditRecord> {
+        self.receiver
+    }
+    async fn recv_inner(&mut self) -> Option<RawAuditRecord> {
         self.receiver.recv().await
     }
 }
 
 impl Default for NetlinkAuditTransport {
     fn default() -> Self {
-        <Self as AuditTransport>::new()
+        Self::new()
     }
 }
 

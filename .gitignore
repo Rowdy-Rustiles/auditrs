@@ -1,3 +1,5 @@
 /.idea
 /target
 workspace.code-workspace
+*.pem
+temp/

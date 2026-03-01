@@ -1,3 +1,9 @@
+/*
+
+To be implemented/structured
+
+*/
+
 use crate::correlator::AuditEvent;
 
 pub struct AuditLogWriter {
