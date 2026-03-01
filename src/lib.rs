@@ -1,9 +1,7 @@
 #![allow(warnings)]
-pub mod audit_transport;
-pub mod audit_types;
+pub mod netlink;
 pub mod correlator;
-pub mod parsed_record;
+pub mod enricher;
 pub mod parser;
-pub mod raw_record;
 pub mod utils;
 pub mod writer;

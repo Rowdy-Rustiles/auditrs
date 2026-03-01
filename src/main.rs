@@ -1,9 +1,4 @@
 #![allow(warnings)]
-use auditrs::correlator::Correlator;
-use auditrs::parser::AuditMessageParser;
-use auditrs::raw_record::RawAuditRecord;
-use auditrs::writer::AuditLogWriter;
-use auditrs::{audit_transport::*, correlator};
 use std::sync::Arc;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
 use tokio::signal;
@@ -11,10 +6,7 @@ use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
 
 
-use auditrs::{
-    audit_transport::*, correlator::*, parsed_record::*, parser::*, raw_record::*,
-    writer::*,
-};
+use auditrs::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
