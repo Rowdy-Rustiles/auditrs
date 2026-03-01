@@ -6,7 +6,11 @@ use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
 
 
-use auditrs::*;
+use auditrs::{
+    correlator::{AuditEvent, Correlator},
+    netlink::{NetlinkAuditTransport, RawAuditRecord},
+    parser::ParsedAuditRecord,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +20,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Todo - wrapping these components in Arc Mutexes might be overkill. Can ownership be moved to their respective tasks?
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
-    let parser = Arc::new(Mutex::new(AuditMessageParser::new()));
     let correlator = Arc::new(Mutex::new(Correlator::new()));
     // let writer = Arc::new(Mutex::new(AuditLogWriter::new()));
     // let rule_manager = Arc::new(Mutex::new(RuleManager::new()));
@@ -28,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let (output_tx, input_rx) = mpsc::channel(buffer_size);
 
     // Start a task that uses each component, with channels hooked up.
-    let parser_task = spawn_parser_task(parser, raw_audit_rx, parsed_audit_tx);
+    let parser_task = spawn_parser_task(raw_audit_rx, parsed_audit_tx);
     let correlator_task = spawn_correlator_task(correlator, parsed_audit_rx, correlated_event_tx);
     let temp_output_task = tokio::spawn(async move {
         let mut rx = correlated_event_rx;
@@ -60,20 +63,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn spawn_parser_task(
-    parser: Arc<Mutex<AuditMessageParser>>,
     mut receiver: mpsc::Receiver<RawAuditRecord>,
     sender: mpsc::Sender<ParsedAuditRecord>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let parser_clone = Arc::clone(&parser);
-        loop {
-            let raw_record = receiver.recv().await;
-            if let Some(raw_record) = raw_record {
-                let parser = parser_clone.lock().await;
-                let parsed_record = ParsedAuditRecord::try_from(raw_record).unwrap();
-                println!("Parsed record: {:?}", parsed_record);
-                sender.send(parsed_record).await.unwrap();
-            }
+        while let Some(raw_record) = receiver.recv().await {
+            let parsed_record = ParsedAuditRecord::try_from(raw_record).unwrap();
+            println!("Parsed record: {:?}", parsed_record);
+            sender.send(parsed_record).await.unwrap();
         }
     })
 }
@@ -104,8 +101,8 @@ fn spawn_correlator_task(
 }
 
 fn spawn_writer_task(
-    writer: Arc<Mutex<AuditLogWriter>>,
-    mut receiver: mpsc::Receiver<AuditEvent>,
+    _writer: Arc<Mutex<auditrs::writer::AuditLogWriter>>,
+    mut _receiver: mpsc::Receiver<AuditEvent>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {

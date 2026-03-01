@@ -3,14 +3,14 @@ This is a simple binary that captures audit messages and logs them to files in v
 The output settings can be configured in the OutputSettings struct, which controls what gets logged and where.
 */
 use audit::new_connection;
-use auditrs::parsed_record::ParsedAuditRecord;
-use auditrs::raw_record::RawAuditRecord;
+use auditrs::parser::ParsedAuditRecord;
+use auditrs::netlink::RawAuditRecord;
 use futures::stream::StreamExt;
 use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
 use audit::packet::{AuditMessage};
 use std::path::Path;
 use std::fs::{self, OpenOptions};
-use std::io::{Write, Result as IoResult};
+use std::io::Write;
 
 #[derive(Clone)]
 struct OutputSettings {
