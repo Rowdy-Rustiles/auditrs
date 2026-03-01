@@ -1,8 +1,9 @@
 [package]
 name = "auditrs"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
-repository = "https://github.com/downloadjpg/auditrs"
+authors = ["Rami Darwiche <rami.darwiche@ufl.edu>", "Callie Foster <brodricfoster@ufl.edu>", "Esse Ciego <esse@ece.ufl.edu>", "Jonathan Xavioer <jxavioer@ufl.edu>", "Mahika Kakkad <mahika.kakkad@ufl.edu>"]
+repository = "https://github.com/Rowdy-Rustiles/auditrs"
 
 [dependencies]
 libc = "0.2.178"
