@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use anyhow::Result;
 
 pub fn timestamp_string_to_systemtime(
     secs_micros_str: &str,
-) -> Result<SystemTime, Box<dyn std::error::Error>> {
+) -> Result<SystemTime> {
     let (secs_str, micros_str) = secs_micros_str
         .split_once('.')
-        .ok_or("Invalid timestamp format")?;
+        .ok_or(anyhow::anyhow!("Invalid timestamp format"))?;
 
     let seconds: u64 = secs_str.parse()?;
 

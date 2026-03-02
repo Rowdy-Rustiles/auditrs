@@ -1,6 +1,7 @@
 #![allow(warnings)]
 use clap::Parser;
 use std::sync::Arc;
+use anyhow::Result;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
 use tokio::signal;
 use tokio::signal::unix::{SignalKind, signal};
@@ -16,7 +17,7 @@ use auditrs::{
     writer::AuditLogWriter,
 };
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     if std::env::consts::OS != "linux" {
         println!("auditRS is only supported on Linux");
         return Ok(());
@@ -28,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Starting auditRS");
             daemon::start_daemon()?;
             // Runtime must be created after fork?? maybe?
-            let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+            let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_worker())
         }
         Commands::Stop => stop_auditrs(),
@@ -37,14 +38,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Config => config_auditrs(),
     };
 
-    if let Err(e) = result {
-        return Err(e);
-    }
+    result?;
 
     Ok(())
 }
 
-async fn run_worker() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_worker() -> Result<()> {
     let writer = AuditLogWriter::new();
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
@@ -58,7 +57,7 @@ async fn run_worker() -> Result<(), Box<dyn std::error::Error>> {
     let writer_task = spawn_writer_task(writer, correlated_event_rx);
 
     // Await a shutdown signal (either via auditrs stop or ctrl+c)
-    let mut sigterm = signal(SignalKind::terminate()).map_err(|e| e.to_string())?;
+    let mut sigterm = signal(SignalKind::terminate())?;
     tokio::select! {
         _ = signal::ctrl_c() => {}
         _ = sigterm.recv() => {}
@@ -74,7 +73,7 @@ async fn run_worker() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn stop_auditrs() -> Result<(), Box<dyn std::error::Error>> {
+fn stop_auditrs() -> Result<()> {
     {
         daemon::stop_daemon()?;
         println!("Stopped auditRS daemon");
@@ -82,12 +81,12 @@ fn stop_auditrs() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn dump_auditrs() -> Result<(), Box<dyn std::error::Error>> {
+fn dump_auditrs() -> Result<()> {
     println!("Dump, WIP");
     Ok(())
 }
 
-fn status_auditrs() -> Result<(), Box<dyn std::error::Error>> {
+fn status_auditrs() -> Result<()> {
     println!(
         "auditRS is {}",
         if daemon::is_running() {
@@ -99,7 +98,7 @@ fn status_auditrs() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn config_auditrs() -> Result<(), Box<dyn std::error::Error>> {
+fn config_auditrs() -> Result<()> {
     println!("Config, WIP");
     Ok(())
 }
