@@ -4,13 +4,15 @@ The output settings can be configured in the OutputSettings struct, which contro
 */
 use audit::new_connection;
 use audit::packet::AuditMessage;
-use auditrs::netlink::RawAuditRecord;
-use auditrs::parser::ParsedAuditRecord;
+use anyhow::{Result, Context};
 use futures::stream::StreamExt;
 use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
+
+use auditrs::netlink::RawAuditRecord;
+use auditrs::parser::ParsedAuditRecord;
 
 #[derive(Clone)]
 struct OutputSettings {
@@ -23,12 +25,12 @@ struct OutputSettings {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
+async fn main() -> Result<()> {
     let current_time = chrono::Utc::now().format("%Y%m%d%H%M%S").to_string();
 
     // Ensure output directory exists
     fs::create_dir_all("output")
-        .map_err(|e| format!("Failed to create output directory: {}", e))?;
+        .context("Failed to create output directory")?;
 
     // Change this to control what gets logged to a file.
     let output_settings = OutputSettings {
@@ -40,10 +42,12 @@ async fn main() -> Result<(), String> {
         conglomerate_path: Some(format!("output/conglomerate_{}.log", current_time)),
     };
 
-    let (connection, mut handle, mut messages) = new_connection().map_err(|e| format!("{e}"))?;
+    let (connection, mut handle, mut messages) = new_connection()
+        .context("Failed to establish audit socket connection.")?;
 
     tokio::spawn(connection);
-    handle.enable_events().await.map_err(|e| format!("{e}"))?;
+    handle.enable_events().await
+        .context("Failed to enable audit events")?;
 
     env_logger::init();
     while let Some((msg, _)) = messages.next().await {
@@ -58,7 +62,7 @@ async fn main() -> Result<(), String> {
 fn handle_message(
     msg: NetlinkMessage<AuditMessage>,
     output_settings: &OutputSettings,
-) -> Result<(), String> {
+) -> Result<()> {
     // NetlinkMessage
     append_to_file(
         output_settings.netlink_message_path.clone(),
@@ -109,13 +113,13 @@ fn handle_message(
         let data = match inner {
             AuditMessage::Event((_, kvs)) => kvs.to_string(),
             AuditMessage::Other((_, data)) => data.clone(),
-            _ => return Err(format!("Invalid AuditMessage: {:?}", inner)),
+            _ => return Err(anyhow::anyhow!(format!("Invalid AuditMessage variant: {:?}", inner))),
         };
 
         let record_id = msg.header.message_type;
         let raw_record = RawAuditRecord::new(record_id, data);
         let parsed_record = ParsedAuditRecord::try_from(raw_record)
-            .map_err(|e| format!("Failed to parse RawAuditRecord: {}", e))?;
+            .context("Failed to parse RawAuditRecord")?;
         append_to_file(
             output_settings.parsed_audit_record_path.clone(),
             &format!("{:?}\n", parsed_record),
@@ -137,7 +141,7 @@ fn handle_message(
 
 // Append content to a file, creating the file if it doesn't exist.
 // Takes in an option just to make calling code cleaner - if the path is None, it does nothing.
-fn append_to_file(path: Option<String>, content: &str) -> Result<(), String> {
+fn append_to_file(path: Option<String>, content: &str) -> Result<()> {
     if let Some(path) = path {
         ensure_parent_dir(&path)?;
 
@@ -145,21 +149,21 @@ fn append_to_file(path: Option<String>, content: &str) -> Result<(), String> {
             .create(true)
             .append(true)
             .open(&path)
-            .map_err(|e| format!("Failed to open {} for appending: {}", path, e))?;
+            .with_context(|| format!("Failed to open file {} for appending", path))?;
 
         file.write(content.as_bytes())
-            .map_err(|e| format!("Failed to append to {}: {}", path, e))?;
+            .with_context(|| format!("Failed to append to {}", path))?;
     }
     Ok(())
 }
 
 // Ensure the parent directory of a file exists
-fn ensure_parent_dir(file_path: &str) -> Result<(), String> {
+fn ensure_parent_dir(file_path: &str) -> Result<()> {
     if let Some(parent) = Path::new(file_path).parent()
         && !parent.exists()
     {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
+            .with_context(|| format!("Failed to create directory {}", parent.display()))?;
     }
     Ok(())
 }

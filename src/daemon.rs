@@ -3,6 +3,7 @@
 /// working with systemctl or similar system services
 use std::fs;
 use std::path::PathBuf;
+use anyhow::{Context, Result};
 
 const PID_FILE_NAME: &str = "auditrs.pid";
 
@@ -26,16 +27,30 @@ fn pid_file_path() -> PathBuf {
 
 /// Daemonize the process using the daemonize crate. Call before starting the worker.
 /// Returns Ok(()) in the daemon process; parent exits inside start().
-pub fn start_daemon() -> Result<(), Box<dyn std::error::Error>> {
+/// Daemonize the process using the daemonize crate. Call before starting the worker.
+/// Returns Ok(()) in the daemon process; parent exits inside start().
+pub fn start_daemon() -> Result<(), anyhow::Error> {
     let path = pid_file_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    daemonize::Daemonize::new()
-        .pid_file(path)
-        .start()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+
+    println!("Daemonizing with PID file at {}", path.display());
+
+    let daemonize =  daemonize::Daemonize::new()
+        .pid_file(path);
+
+    println!("Starting daemonization");
+
+    match daemonize.start() {
+        Ok(_) => {
+            println!("Successfully daemonized");
+            Ok(())
+        },
+        Err(e) => {
+            println!("Failed to daemonize: {}", e);
+            Err(anyhow::anyhow!("Failed to daemonize: {}", e))},
+    }
 }
 
 /// Remove the PID file. Call on daemon shutdown.
@@ -44,13 +59,13 @@ pub fn remove_pid_file() {
 }
 
 /// Send SIGTERM to the daemon and remove the PID file (used by `auditrs stop`).
-pub fn stop_daemon() -> Result<(), Box<dyn std::error::Error>> {
+pub fn stop_daemon() -> Result<()> {
     let path = pid_file_path();
-    let contents = fs::read_to_string(&path).map_err(|_| format!("AuditRS is already stopped"))?;
+    let contents = fs::read_to_string(&path).context("AuditRS is already stopped")?;
     let pid: i32 = contents
         .trim()
         .parse()
-        .map_err(|_| format!("invalid PID in {}", path.display()))?;
+        .with_context(|| format!("invalid PID in {}", path.display()))?;
     if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
         return Err(std::io::Error::last_os_error().into());
     }
