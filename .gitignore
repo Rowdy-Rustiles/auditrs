@@ -3,3 +3,6 @@
 workspace.code-workspace
 *.pem
 temp/
+output/
+.idea/
+ec2/

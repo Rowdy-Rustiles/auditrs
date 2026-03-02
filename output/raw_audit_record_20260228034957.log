@@ -1,5 +1,0 @@
-(1305, "audit(1772250597.943:471): op=set audit_enabled=1 old=1 auid=1000 ses=1 subj=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 res=1")
-(1305, "audit(1772250597.943:471): op=set audit_pid=8651 old=0 auid=1000 ses=1 subj=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 res=1")
-(1300, "audit(1772250597.943:471): arch=c000003e syscall=44 success=yes exit=56 a0=9 a1=55e738b1f720 a2=38 a3=0 items=0 ppid=8650 pid=8651 auid=1000 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=pts3 ses=1 comm=\"tokio-runtime-w\" exe=\"/home/ec2-user/auditrs/target/debug/capture\" subj=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 key=(null)")
-(1327, "audit(1772250597.943:471): proctitle=\"target/debug/capture\"")
-(1320, "audit(1772250597.943:471): ")
