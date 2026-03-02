@@ -1,6 +1,7 @@
 use super::{
-    AuditLogWriter, DEFAULT_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT, OutputFormat, WriteError,
+    AuditLogWriter, DEFAULT_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT, OutputFormat,
 };
+use anyhow::Result;
 use crate::correlator::AuditEvent;
 use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::Write;
@@ -24,7 +25,7 @@ impl AuditLogWriter {
         }
     }
 
-    pub fn write_event(&mut self, event: AuditEvent) -> Result<(), WriteError> {
+    pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
         match self.output_format {
             OutputFormat::Legacy => self.write_event_legacy(event),
             OutputFormat::Simple => self.write_event_simple(event),
@@ -32,17 +33,17 @@ impl AuditLogWriter {
         }
     }
 
-    fn write_event_legacy(&mut self, _event: AuditEvent) -> Result<(), WriteError> {
+    fn write_event_legacy(&mut self, event: AuditEvent) -> Result<()> {
         todo!()
     }
 
-    fn write_event_simple(&mut self, event: AuditEvent) -> Result<(), WriteError> {
-        writeln!(self.file_handle, "{}", event).map_err(|_| WriteError::Unknown)?;
-        self.file_handle.flush().map_err(|_| WriteError::Unknown)?;
+    fn write_event_simple(&mut self, event: AuditEvent) -> Result<()> {
+        writeln!(self.file_handle, "{}", event)?;
+        self.file_handle.flush()?;
         Ok(())
     }
 
-    fn write_event_json(&mut self, _event: AuditEvent) -> Result<(), WriteError> {
+    fn write_event_json(&mut self, _event: AuditEvent) -> Result<()> {
         todo!()
     }
 }

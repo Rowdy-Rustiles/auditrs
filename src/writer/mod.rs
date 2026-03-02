@@ -22,11 +22,6 @@ pub struct AuditLogWriter {
     file_handle: File,
 }
 
-#[derive(Debug)]
-pub enum WriteError {
-    Unknown,
-}
-
 enum OutputFormat {
     Legacy,
     Simple,
