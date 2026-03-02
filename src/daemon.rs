@@ -16,7 +16,10 @@ fn pid_file_path() -> PathBuf {
         return PathBuf::from(dir).join(PID_FILE_NAME);
     }
     if let Ok(home) = std::env::var("HOME") {
-        return PathBuf::from(home).join(".cache").join("auditrs").join(PID_FILE_NAME);
+        return PathBuf::from(home)
+            .join(".cache")
+            .join("auditrs")
+            .join(PID_FILE_NAME);
     }
     PathBuf::from(".").join(PID_FILE_NAME)
 }
@@ -43,8 +46,7 @@ pub fn remove_pid_file() {
 /// Send SIGTERM to the daemon and remove the PID file (used by `auditrs stop`).
 pub fn stop_daemon() -> Result<(), Box<dyn std::error::Error>> {
     let path = pid_file_path();
-    let contents = fs::read_to_string(&path)
-        .map_err(|_| format!("AuditRS is already stopped"))?;
+    let contents = fs::read_to_string(&path).map_err(|_| format!("AuditRS is already stopped"))?;
     let pid: i32 = contents
         .trim()
         .parse()

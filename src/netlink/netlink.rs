@@ -1,14 +1,8 @@
-use crate::netlink::RawAuditRecord;
+use super::{NetlinkAuditTransport, RawAuditRecord};
 use audit::packet::AuditMessage;
 use futures::stream::StreamExt;
 use netlink_packet_core::NetlinkPayload;
 use tokio::sync::mpsc;
-
-pub struct NetlinkAuditTransport {
-    receiver: mpsc::Receiver<RawAuditRecord>,
-}
-
-
 
 impl NetlinkAuditTransport {
     pub fn new() -> Self {

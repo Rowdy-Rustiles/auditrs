@@ -1,37 +1,42 @@
 #![allow(warnings)]
+use clap::Parser;
 use std::sync::Arc;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
 use tokio::signal;
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{Mutex, mpsc};
 use tokio::time::sleep;
-use clap::Parser;
 
 use auditrs::cli::{Cli, Commands};
 use auditrs::{
     correlator::{AuditEvent, Correlator},
+    daemon,
     netlink::{NetlinkAuditTransport, RawAuditRecord},
     parser::ParsedAuditRecord,
-    daemon
+    writer::AuditLogWriter,
 };
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if(std::env::consts::OS != "linux") {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::consts::OS != "linux" {
         println!("auditRS is only supported on Linux");
         return Ok(());
     }
 
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Start => start_auditrs().await,
+        Commands::Start => {
+            println!("Starting auditRS");
+            daemon::start_daemon()?;
+            // Runtime must be created after fork?? maybe?
+            let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+            rt.block_on(run_worker())
+        }
         Commands::Stop => stop_auditrs(),
         Commands::Dump => dump_auditrs(),
         Commands::Status => status_auditrs(),
         Commands::Config => config_auditrs(),
     };
 
-    /// Im not sure why this prints with quotes
-    /// anyways I think we should add a verbose flag for more detailed error messages
     if let Err(e) = result {
         return Err(e);
     }
@@ -39,42 +44,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn start_auditrs() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting auditRS");
-    daemon::start_daemon()?;
-
-    run_worker().await
-}
-
 async fn run_worker() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize components.
+    let writer = AuditLogWriter::new();
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
-    let correlator = Arc::new(Mutex::new(Correlator::new()));
+    let correlator = Correlator::new();
 
     let (parsed_audit_tx, parsed_audit_rx) = mpsc::channel(1000);
     let (correlated_event_tx, correlated_event_rx) = mpsc::channel(1000);
 
     let parser_task = spawn_parser_task(raw_audit_rx, parsed_audit_tx);
     let correlator_task = spawn_correlator_task(correlator, parsed_audit_rx, correlated_event_tx);
-    let temp_output_task = tokio::spawn(async move {
-        let mut rx = correlated_event_rx;
-        while rx.recv().await.is_some() {}
-    });
+    let writer_task = spawn_writer_task(writer, correlated_event_rx);
 
-    // to be removed
-    {
-        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())?;
-        tokio::select! {
-            _ = signal::ctrl_c() => {} 
-            _ = sigterm.recv() => {}
-        }
+    // Await a shutdown signal (either via auditrs stop or ctrl+c)
+    let mut sigterm = signal(SignalKind::terminate()).map_err(|e| e.to_string())?;
+    tokio::select! {
+        _ = signal::ctrl_c() => {}
+        _ = sigterm.recv() => {}
     }
 
     parser_task.abort();
     correlator_task.abort();
-    temp_output_task.abort();
-    let _ = tokio::join!(parser_task, correlator_task, temp_output_task);
+    writer_task.abort();
+    let _ = tokio::join!(parser_task, correlator_task, writer_task);
 
     daemon::remove_pid_file();
 
@@ -95,7 +88,14 @@ fn dump_auditrs() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn status_auditrs() -> Result<(), Box<dyn std::error::Error>> {
-    println!("auditRS is {}", if daemon::is_running() { "running" } else { "not running" });
+    println!(
+        "auditRS is {}",
+        if daemon::is_running() {
+            "running"
+        } else {
+            "not running"
+        }
+    );
     Ok(())
 }
 
@@ -118,7 +118,7 @@ fn spawn_parser_task(
 }
 
 fn spawn_correlator_task(
-    correlator: Arc<Mutex<Correlator>>,
+    mut correlator: Correlator,
     mut receiver: mpsc::Receiver<ParsedAuditRecord>,
     sender: mpsc::Sender<AuditEvent>,
 ) -> tokio::task::JoinHandle<()> {
@@ -128,12 +128,10 @@ fn spawn_correlator_task(
             /// The second branch is executed periodically, every 500ms.
             tokio::select! {
                 Some(record) = receiver.recv() => {
-                    correlator.lock().await.push(record);
+                    correlator.push(record);
                 }
                 _ = sleep(Duration::from_millis(500)) => {
-                    let mut corr = correlator.lock().await;
-                    for event in corr.flush_expired() {
-                        println!("Correlated event: {:?}", event);
+                    for event in correlator.flush_expired() {
                         sender.send(event).await.unwrap();
                     }
                 }
@@ -143,17 +141,14 @@ fn spawn_correlator_task(
 }
 
 fn spawn_writer_task(
-    _writer: Arc<Mutex<auditrs::writer::AuditLogWriter>>,
-    mut _receiver: mpsc::Receiver<AuditEvent>,
+    mut writer: AuditLogWriter,
+    mut receiver: mpsc::Receiver<AuditEvent>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        loop {
-            println!("writng the disk :p");
-            sleep(Duration::from_millis(100)).await;
-            /* e.g.,
-            let event = receiver.recv().await
-            write_event_to_disk(event);
-            */
+        while let Some(event) = receiver.recv().await {
+            if let Err(e) = writer.write_event(event) {
+                eprintln!("Failed to write audit event: {:?}", e);
+            }
         }
     })
 }

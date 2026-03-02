@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+use super::{ParsedAuditRecord, RecordData};
+use crate::netlink::RawAuditRecord;
 use crate::utils::timestamp_string_to_systemtime;
 use nom::Finish;
 use nom::{
-    bytes::complete::{tag, take_while1, take_while},
+    IResult,
+    bytes::complete::{tag, take_while, take_while1},
     character::complete::{char, space1},
     sequence::tuple,
-    IResult,
 };
-use crate::netlink::RawAuditRecord;
-use super::{ParsedAuditRecord, RecordData};
-
 
 impl ParsedAuditRecord {
     /// Returns (timestamp, serial) identifying the audit event this record belongs to.
@@ -95,7 +94,7 @@ fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
     let timestamp = (timestamp_digits, char('.'), timestamp_milis);
     let serial_digits = take_while1(|c: char| c.is_ascii_digit());
 
-    // Parse the header: 'audit(1234567890.123:456):' 
+    // Parse the header: 'audit(1234567890.123:456):'
     let (input, (_, timestamp_tuple, _, serial, _, _)) = tuple((
         audit_tag,
         timestamp,
@@ -108,15 +107,16 @@ fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
     // Now parse the rest of the line as key-value pairs
     // Brute implementation: put everything into a single "kv" field.
     // There will only be one line in the payload, so we can just take until the end of the line
-    
-    
+
     let (input, _) = space1(input)?; // consume the space after the header
-    
+
     let (input, kvs) = take_while(|_| true)(input)?;
     let mut fields = HashMap::new();
     fields.insert("kv".to_string(), kvs.to_string());
 
-    let timestamp = timestamp_string_to_systemtime(&format!("{}.{}", timestamp_tuple.0, timestamp_tuple.2)).unwrap();
+    let timestamp =
+        timestamp_string_to_systemtime(&format!("{}.{}", timestamp_tuple.0, timestamp_tuple.2))
+            .unwrap();
     let serial = serial.to_string();
 
     let parsed_record = RecordData {
@@ -152,7 +152,7 @@ mod test {
         };
 
         let result = parse_audit_message(input);
-        assert!(result.is_ok(), "Parsing failed: {:?}", result);   
+        assert!(result.is_ok(), "Parsing failed: {:?}", result);
         let (remaining, parsed) = result.unwrap();
         assert_eq!(remaining, "");
         assert_eq!(parsed.timestamp, expected.timestamp);

@@ -1,5 +1,5 @@
-use std::collections::hash_map::Entry;
-use std::time::{Duration, Instant};
+use std::collections::{HashMap, hash_map::Entry};
+use std::time::{Duration, Instant, SystemTime};
 
 use crate::parser::ParsedAuditRecord;
 
@@ -7,12 +7,12 @@ use super::Correlator;
 
 const TIMEOUT: Duration = Duration::from_secs(3);
 
-type Identifier = (std::time::SystemTime, u16);
+type Identifier = (SystemTime, u16);
 
 impl Correlator {
     pub fn new() -> Self {
         Self {
-            event_buffer: std::collections::HashMap::new(),
+            event_buffer: HashMap::new(),
         }
     }
 

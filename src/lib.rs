@@ -1,9 +1,9 @@
 #![allow(warnings)]
-pub mod netlink;
+pub mod cli;
 pub mod correlator;
+pub mod daemon;
 pub mod enricher;
+pub mod netlink;
 pub mod parser;
 pub mod utils;
 pub mod writer;
-pub mod daemon;
-pub mod cli;

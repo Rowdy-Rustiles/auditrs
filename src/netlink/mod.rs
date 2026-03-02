@@ -19,10 +19,12 @@
 mod netlink;
 mod raw_record;
 
-pub use netlink::NetlinkAuditTransport;
-
 #[derive(Debug, PartialEq)]
 pub struct RawAuditRecord {
     pub record_id: u16,
     pub data: String,
+}
+
+pub struct NetlinkAuditTransport {
+    pub(crate) receiver: tokio::sync::mpsc::Receiver<RawAuditRecord>,
 }
