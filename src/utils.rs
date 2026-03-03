@@ -23,8 +23,7 @@ pub fn systemtime_to_utc_string(systemtime: SystemTime) -> String {
 
 pub fn systemtime_to_timestamp_string(
     systime: SystemTime,
-) -> String {
+) -> Result<String> {
     let duration = systime.duration_since(UNIX_EPOCH)?;
-    
-    format!("{}.{:03}", duration.as_secs(), duration.subsec_millis())
+    Ok(format!("{}.{:03}", duration.as_secs(), duration.subsec_millis()))
 }

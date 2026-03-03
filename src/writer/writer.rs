@@ -41,7 +41,7 @@ impl AuditLogWriter {
         for record in event.records {
             prefix = format!("type={} msg=audit({}:{}",
                              record.record_type.as_audit_str(),
-                             systemtime_to_timestamp_string(event.timestamp),
+                             systemtime_to_timestamp_string(event.timestamp)?,
                              event.serial);
             for field in record.fields {
                 fields.push_str(format!(" {}={}", field.0, field.1));
@@ -61,10 +61,12 @@ impl AuditLogWriter {
     }
 
     fn write_event_json(&mut self, event: AuditEvent) -> Result<()> {
+        todo!();
         let timestamp = format!("\"timestamp\": \"{}\"", systemtime_to_utc_string(event.timestamp));
         let serial = format!("\"serial\": \"{}\"", event.serial);
 
-        // writeln!(self.file_handle, );
+        let res = format!("");
+        writeln!(self.file_handle, );
         Ok(())
     }
 }
