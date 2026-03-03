@@ -6,6 +6,8 @@ use crate::correlator::AuditEvent;
 use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::UNIX_EPOCH;
+use crate::utils::*;
 
 impl AuditLogWriter {
     pub fn new() -> Self {
@@ -37,9 +39,12 @@ impl AuditLogWriter {
         let prefix;
         let fields;
         for record in event.records {
-            prefix = format!("type={:?} msg=audit({:?}.{:?}:", record.record_type, event.timestamp, event.serial);
+            prefix = format!("type={} msg=audit({}:{}",
+                             record.record_type.as_audit_str(),
+                             systemtime_to_timestamp_string(event.timestamp),
+                             event.serial);
             for field in record.fields {
-                fields.push_str(format!(" {:?}={:?}", field.0, field.1));
+                fields.push_str(format!(" {}={}", field.0, field.1));
             }
         }
         let line = format!("{}{}", prefix, fields);
@@ -55,7 +60,11 @@ impl AuditLogWriter {
         Ok(())
     }
 
-    fn write_event_json(&mut self, _event: AuditEvent) -> Result<()> {
-        todo!()
+    fn write_event_json(&mut self, event: AuditEvent) -> Result<()> {
+        let timestamp = format!("\"timestamp\": \"{}\"", systemtime_to_utc_string(event.timestamp));
+        let serial = format!("\"serial\": \"{}\"", event.serial);
+
+        // writeln!(self.file_handle, );
+        Ok(())
     }
 }
