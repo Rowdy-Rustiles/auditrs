@@ -2,9 +2,9 @@
 This is a simple binary that captures audit messages and logs them to files in various stages of processing.
 The output settings can be configured in the OutputSettings struct, which controls what gets logged and where.
 */
+use anyhow::{Context, Result};
 use audit::new_connection;
 use audit::packet::AuditMessage;
-use anyhow::{Result, Context};
 use futures::stream::StreamExt;
 use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
 use std::fs::{self, OpenOptions};
@@ -29,8 +29,7 @@ async fn main() -> Result<()> {
     let current_time = chrono::Utc::now().format("%Y%m%d%H%M%S").to_string();
 
     // Ensure output directory exists
-    fs::create_dir_all("output")
-        .context("Failed to create output directory")?;
+    fs::create_dir_all("output").context("Failed to create output directory")?;
 
     // Change this to control what gets logged to a file.
     let output_settings = OutputSettings {
@@ -42,11 +41,13 @@ async fn main() -> Result<()> {
         conglomerate_path: Some(format!("output/conglomerate_{}.log", current_time)),
     };
 
-    let (connection, mut handle, mut messages) = new_connection()
-        .context("Failed to establish audit socket connection.")?;
+    let (connection, mut handle, mut messages) =
+        new_connection().context("Failed to establish audit socket connection.")?;
 
     tokio::spawn(connection);
-    handle.enable_events().await
+    handle
+        .enable_events()
+        .await
         .context("Failed to enable audit events")?;
 
     env_logger::init();
@@ -113,13 +114,18 @@ fn handle_message(
         let data = match inner {
             AuditMessage::Event((_, kvs)) => kvs.to_string(),
             AuditMessage::Other((_, data)) => data.clone(),
-            _ => return Err(anyhow::anyhow!(format!("Invalid AuditMessage variant: {:?}", inner))),
+            _ => {
+                return Err(anyhow::anyhow!(format!(
+                    "Invalid AuditMessage variant: {:?}",
+                    inner
+                )));
+            }
         };
 
         let record_id = msg.header.message_type;
         let raw_record = RawAuditRecord::new(record_id, data);
-        let parsed_record = ParsedAuditRecord::try_from(raw_record)
-            .context("Failed to parse RawAuditRecord")?;
+        let parsed_record =
+            ParsedAuditRecord::try_from(raw_record).context("Failed to parse RawAuditRecord")?;
         append_to_file(
             output_settings.parsed_audit_record_path.clone(),
             &format!("{:?}\n", parsed_record),

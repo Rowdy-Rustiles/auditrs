@@ -4,6 +4,7 @@ version = "0.3.0"
 edition = "2024"
 authors = ["Rami Darwiche <rami.darwiche@ufl.edu>", "Callie Foster <brodricfoster@ufl.edu>", "Esse Ciego <esse@ece.ufl.edu>", "Jonathan Xavioer <jxavioer@ufl.edu>", "Mahika Kakkad <mahika.kakkad@ufl.edu>"]
 repository = "https://github.com/Rowdy-Rustiles/auditrs"
+default-run="auditrs"
 
 [dependencies]
 libc = "0.2.178"

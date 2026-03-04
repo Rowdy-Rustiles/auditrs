@@ -1,11 +1,11 @@
+use anyhow::{Context, Result};
 /// Functions for daemonizing auditrs and managing the PID file.
 /// In the future, some work should be done to see if we can get this
 /// working with systemctl or similar system services
 use std::fs;
 use std::path::PathBuf;
-use anyhow::{Context, Result};
 
-const PID_FILE_NAME: &str = "auditrs.pid";
+use crate::daemon::PID_FILE_NAME;
 
 fn pid_file_path() -> PathBuf {
     unsafe {
@@ -27,8 +27,6 @@ fn pid_file_path() -> PathBuf {
 
 /// Daemonize the process using the daemonize crate. Call before starting the worker.
 /// Returns Ok(()) in the daemon process; parent exits inside start().
-/// Daemonize the process using the daemonize crate. Call before starting the worker.
-/// Returns Ok(()) in the daemon process; parent exits inside start().
 pub fn start_daemon() -> Result<(), anyhow::Error> {
     let path = pid_file_path();
     if let Some(parent) = path.parent() {
@@ -37,8 +35,7 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
 
     println!("Daemonizing with PID file at {}", path.display());
 
-    let daemonize =  daemonize::Daemonize::new()
-        .pid_file(path);
+    let daemonize = daemonize::Daemonize::new().pid_file(path);
 
     println!("Starting daemonization");
 
@@ -46,10 +43,11 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
         Ok(_) => {
             println!("Successfully daemonized");
             Ok(())
-        },
+        }
         Err(e) => {
             println!("Failed to daemonize: {}", e);
-            Err(anyhow::anyhow!("Failed to daemonize: {}", e))},
+            Err(anyhow::anyhow!("Failed to daemonize: {}", e))
+        }
     }
 }
 
