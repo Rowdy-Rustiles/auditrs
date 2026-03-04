@@ -46,9 +46,8 @@ mod event;
 use crate::parser::ParsedAuditRecord;
 use std::collections::HashMap;
 use std::time::{Instant, SystemTime};
-use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone)]
 pub struct AuditEvent {
     pub timestamp: SystemTime,
     pub serial: u16,
