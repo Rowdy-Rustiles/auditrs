@@ -1,12 +1,10 @@
 #![allow(warnings)]
 use clap::Parser;
-use nom::Err;
-use std::sync::Arc;
 use anyhow::Result;
 use std::time::Duration; // todo - when to use std::sync vs tokio::sync ?? tokio docs say something about access across threads
 use tokio::signal;
 use tokio::signal::unix::{SignalKind, signal};
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 use auditrs::cli::{Cli, Commands};
@@ -25,7 +23,7 @@ fn main() -> Result<()> {
     }
 
     let cli = Cli::parse();
-    let result = match cli.command {
+    match cli.command {
         Commands::Start => {
             println!("Starting auditRS");
             daemon::start_daemon()?;
@@ -131,8 +129,8 @@ fn spawn_correlator_task(
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
-            /// Two async branches are run, the first to succeed will be executed.
-            /// The second branch is executed periodically, every 500ms.
+            // Two async branches are run, the first to succeed will be executed.
+            // The second branch is executed periodically, every 500ms.
             tokio::select! {
                 Some(record) = receiver.recv() => {
                     correlator.push(record);

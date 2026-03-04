@@ -16,8 +16,6 @@
     and additionally find more modern types
 */
 
-use strum_macros::Display;
-
 mod netlink;
 mod raw_record;
 

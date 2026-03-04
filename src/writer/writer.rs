@@ -3,7 +3,7 @@ use super::{
 };
 use anyhow::Result;
 use crate::correlator::AuditEvent;
-use std::fs::{File, OpenOptions, create_dir_all};
+use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
