@@ -187,7 +187,8 @@ fn build_config() -> ClapCommand {
                 .about("Read config values")
                 .subcommand(ClapCommand::new("directory").about("Get the current log directory"))
                 .subcommand(ClapCommand::new("size").about("Get the current log size limit"))
-                .subcommand(ClapCommand::new("format").about("Get the current output format")),
+                .subcommand(ClapCommand::new("format").about("Get the current output format"))
+                .subcommand(ClapCommand::new("filters").about("Get the current log filters")),
         )
         .subcommand(
             ClapCommand::new("set")
@@ -223,7 +224,6 @@ fn build_config() -> ClapCommand {
                                 .help("New output format"),
                         ),
                 )
-                .subcommand_required(true)
                 .arg_required_else_help(true),
         )
         .subcommand(
@@ -291,10 +291,9 @@ fn build_config() -> ClapCommand {
                                 .help("New filter action"),
                         ),
                 )
-                .subcommand_required(true)
                 .arg_required_else_help(true),
         )
-        .subcommand_required(true)
+        .arg_required_else_help(true)
 }
 
 #[cfg(test)]

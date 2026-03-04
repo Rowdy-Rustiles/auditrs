@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::ArgMatches;
 
+use crate::config::{get_config, GetConfigVariables};
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
 
 /// Top-level entry point for handling CLI subcommands
@@ -66,7 +67,18 @@ fn handle_report(_matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn handle_config(_matches: &ArgMatches) -> Result<()> {
-    println!("Config, WIP");
-    Ok(())
+fn handle_config(matches: &ArgMatches) -> Result<()> {
+    match matches.subcommand() {
+        Some(("get", sub_m)) => {
+            let key = match sub_m.subcommand_name() {
+                Some("directory") => Some(GetConfigVariables::OutputDirectory),
+                Some("size") => Some(GetConfigVariables::LogSize),
+                Some("format") => Some(GetConfigVariables::LogFormat),
+                Some("filters") => Some(GetConfigVariables::LogFilters),
+                _ => None,
+            };
+            get_config(key)
+        }
+        _ => Ok(()),
+    }
 }

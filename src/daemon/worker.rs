@@ -10,8 +10,11 @@ use crate::daemon::daemon;
 use crate::netlink::{NetlinkAuditTransport, RawAuditRecord};
 use crate::parser::ParsedAuditRecord;
 use crate::writer::AuditLogWriter;
+use crate::config::load_config;
+
 
 pub async fn run_worker() -> Result<()> {
+    let config = load_config().unwrap();
     let writer = AuditLogWriter::new()?;
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
