@@ -44,7 +44,7 @@ fn main() -> Result<()> {
 }
 
 async fn run_worker() -> Result<()> {
-    let writer = AuditLogWriter::new();
+    let writer = AuditLogWriter::new()?; // can fail to open log file.
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
     let correlator = Correlator::new();
@@ -109,9 +109,17 @@ fn spawn_parser_task(
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(raw_record) = receiver.recv().await {
-            let parsed_record = ParsedAuditRecord::try_from(raw_record).unwrap();
-            println!("Parsed record: {:?}", parsed_record);
-            sender.send(parsed_record).await.unwrap();
+            match ParsedAuditRecord::try_from(raw_record) {
+                Ok(parsed_record) => 
+                    {println!("Parsed record: {:?}", parsed_record);
+                    sender.send(parsed_record).await
+                        .unwrap_or_else(|e| eprintln!("Failed to send parsed record: {:?}", e));
+                }
+                Err(e) => {
+                    eprintln!("Failed to parse raw audit record: {:?}", e);
+                    continue;
+                }
+            };
         }
     })
 }

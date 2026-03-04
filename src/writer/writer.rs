@@ -10,21 +10,20 @@ use std::time::UNIX_EPOCH;
 use crate::utils::*;
 
 impl AuditLogWriter {
-    pub fn new() -> Self {
+    pub fn new() -> anyhow::Result<Self> {
         let log_dir = PathBuf::from(DEFAULT_DIR);
-        create_dir_all(&log_dir).expect("failed to create log directory");
+        create_dir_all(&log_dir)?;
         let log_file = log_dir.join("auditrs.log");
         let file_handle = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&log_file)
-            .unwrap_or_else(|e| panic!("failed to open log file {}: {}", log_file.display(), e));
-        Self {
+            .open(&log_file)?;
+        Ok(Self {
             output_format: DEFAULT_OUTPUT_FORMAT,
             destination: log_dir,
             log_size: DEFAULT_LOG_SIZE,
             file_handle,
-        }
+        })
     }
 
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
