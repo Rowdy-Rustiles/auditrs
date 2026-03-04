@@ -69,5 +69,58 @@ impl AuditLogWriter {
 
 #[cfg(test)]
 mod test {
+    use crate::parser::ParsedAuditRecord;
+    use crate::parser::RecordType;
+    use std::collections::HashMap;
+    use super::*;
+    fn generate_test_event() -> AuditEvent {
+        let sample_timestamp = timestamp_string_to_systemtime("1768231884.588").unwrap();
+        let record_1 = ParsedAuditRecord {
+            record_type: RecordType::Syscall,
+            timestamp: sample_timestamp,
+            serial: 1151,
+            fields: ,
+        }
+        let record_2 = ParsedAuditRecord {
+            record_type: RecordType::Cwd,
+            timestamp: sample_timestamp,
+            serial: 1151,
+            fields: HashMap::from([("cwd", "/")]),
+        }
+        let record_3 = ParsedAuditRecord {
+            record_type: RecordType::Path,
+            timestamp: sample_timestamp,
+            serial: 1151,
+            fields: ,
+        }
+        let record_4 = ParsedAuditRecord {
+            record_type: RecordType::Proctitle,
+            timestamp: sample_timestamp,
+            serial: 1151,
+            fields: ,
+        }
+
+        let event = AuditEvent {
+            timestamp: sample_timestamp,
+            serial: 1151,
+            record_count: 4,
+            records: vec![record_1, record_2, record_3, record_4],
+        }
+    }
+    #[test]
+    fn test_write_legacy() {
+        let event = generate_test_event();
+
+    }
+
+    #[test]
+    fn test_write_simple() {
+
+    }
+
+    #[test]
+    fn test_write_json() {
+
+    }
 
 }
