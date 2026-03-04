@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::ArgMatches;
 
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
-use crate::daemon::worker::run_worker;
 
 /// Top-level entry point for handling CLI subcommands
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
@@ -25,12 +24,7 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
 }
 
 fn start_auditrs() -> Result<()> {
-    println!("Starting auditRS");
-    start_daemon()?;
-    println!("auditRS daemon started");
-
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(run_worker())
+    start_daemon()
 }
 
 fn stop_auditrs() -> Result<()> {

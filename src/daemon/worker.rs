@@ -35,9 +35,6 @@ pub async fn run_worker() -> Result<()> {
     correlator_task.abort();
     writer_task.abort();
     let _ = tokio::join!(parser_task, correlator_task, writer_task);
-
-    daemon::remove_pid_file();
-
     Ok(())
 }
 
