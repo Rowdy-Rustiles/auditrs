@@ -5,6 +5,7 @@ use anyhow::Result;
 use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Output;
 use std::time::UNIX_EPOCH;
 
 impl AuditLogWriter {
@@ -79,48 +80,94 @@ mod test {
             record_type: RecordType::Syscall,
             timestamp: sample_timestamp,
             serial: 1151,
-            fields: ,
-        }
+            fields: HashMap::from([
+                                      ("arch".into(), "c000003e".into()),
+                                      ("syscall".into(), "257".into()),
+                                      ("success".into(), "yes".into()),
+                                      ("exit".into(), "6".into()),
+                                      ("a0".into(), "ffffff9c".into()),
+                                      ("a1".into(), "7ff64c375eae".into()),
+                                      ("a2".into(), "80000".into()),
+                                      ("a3".into(), "0".into()),
+                                      ("items".into(), "1".into()),
+                                      ("ppid".into(), "977".into()),
+                                      ("pid".into(), "3280".into()),
+                                      ("auid".into(), "4294967295".into()),
+                                      ("uid".into(), "998".into()),
+                                      ("gid".into(), "996".into()),
+                                      ("euid".into(), "998".into()),
+                                      ("suid".into(), "998".into()),
+                                      ("fsuid".into(), "998".into()),
+                                      ("egid".into(), "996".into()),
+                                      ("sgid".into(), "996".into()),
+                                      ("fsgid".into(), "996".into()),
+                                      ("tty".into(), "(none)".into()),
+                                      ("ses".into(), "4294967295".into()),
+                                      ("comm".into(), "pkla-check-auth".into()),
+                                      ("exe".into(), "/usr/bin/pkla-check-authorization".into()),
+                                      ("key".into(), "beck_passwd".into()),
+                                      ("ARCH".into(), "x86_64".into()),
+                                      ("SYSCALL".into(), "openat".into()),
+                                      ("AUID".into(), "unset".into()),
+                                      ("UID".into(), "polkitd".into()),
+                                      ("GID".into(), "polkitd".into()),
+                                      ("EUID".into(), "polkitd".into()),
+                                      ("SUID".into(), "polkitd".into()),
+                                      ("FSUID".into(), "polkitd".into()),
+                                      ("EGID".into(), "polkitd".into()),
+                                      ("SGID".into(), "polkitd".into()),
+                                      ("FSGID".into(), "polkitd".into())
+                                      ]),
+        };
         let record_2 = ParsedAuditRecord {
             record_type: RecordType::Cwd,
             timestamp: sample_timestamp,
             serial: 1151,
-            fields: HashMap::from([("cwd", "/")]),
-        }
+            fields: HashMap::from([("cwd".into(), "/".into())]),
+        };
         let record_3 = ParsedAuditRecord {
             record_type: RecordType::Path,
             timestamp: sample_timestamp,
             serial: 1151,
-            fields: ,
-        }
+            fields: HashMap::from([
+                ("item".into(), "0".into()),
+                ("name".into(), "/etc/passwd".into()),
+                ("inode".into(), "137618356".into()),
+                ("dev".into(), "fd:00".into()),
+                ("mode".into(), "0100644".into()),
+                ("ouid".into(), "0".into()),
+                ("ogid".into(), "0".into()),
+                ("rdev".into(), "00:00".into()),
+                ("nametype".into(), "NORMAL".into()),
+                ("cap_fp".into(), "0".into()),
+                ("cap_fi".into(), "0".into()),
+                ("cap_fe".into(), "0".into()),
+                ("cap_fver".into(), "0".into()),
+                ("cap_frootid".into(), "0".into()),
+                ("OUID".into(), "root".into()),
+                ("OGID".into(), "root".into()),
+            ]),
+        };
         let record_4 = ParsedAuditRecord {
             record_type: RecordType::Proctitle,
             timestamp: sample_timestamp,
             serial: 1151,
-            fields: ,
-        }
+            fields: HashMap::from(["proctitle".into(), "2F7573722F62696E2F706B6C612D636865636B2D617574686F72697A6174696F6E007573657200747275650074727565006F72672E667265656465736B746F702E4E6574776F726B4D616E616765722E776966692E7363616E".into()]),
+        };
 
         let event = AuditEvent {
             timestamp: sample_timestamp,
             serial: 1151,
             record_count: 4,
             records: vec![record_1, record_2, record_3, record_4],
-        }
+        };
+
+        event
     }
     #[test]
-    fn test_write_legacy() {
+    fn test_write_event() {
         let event = generate_test_event();
-
+        let mut writer = AuditLogWriter::new().unwrap();
+        writer.write_event(event).unwrap();
     }
-
-    #[test]
-    fn test_write_simple() {
-
-    }
-
-    #[test]
-    fn test_write_json() {
-
-    }
-
 }
