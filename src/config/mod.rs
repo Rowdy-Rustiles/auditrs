@@ -5,7 +5,7 @@ pub mod state;
 
 pub use config::{get_config, load_config, set_config};
 pub use filters::{
-    add_filter_interactive, get_filters, load_filters, remove_filter_interactive,
+    add_filter_interactive, get_filters, import_filters, load_filters, remove_filter_interactive,
     update_filter_interactive,
 };
 use serde::Deserialize;
@@ -47,9 +47,10 @@ pub enum GetConfigVariables {
 pub enum SetConfigVariables {
     OutputDirectory { value: String },
     LogSize { value: usize },
-    LogFormat { value: LogFormat },
+    LogFormat
 }
 
+// Unused, for reference
 #[derive(Copy, Clone, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LogFormat {

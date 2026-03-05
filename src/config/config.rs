@@ -3,6 +3,7 @@ use std::{fs::{OpenOptions}, io::{Write}};
 use std::path::Path;
 use anyhow::{Result, anyhow};
 use config::Config;
+use inquire::Select;
 
 const DEFAULT_CONFIG: &str = r#"[meta]
 version = "0.3.0"
@@ -67,17 +68,22 @@ impl AuditConfig {
             SetConfigVariables::LogSize { value } => {
                 settings.insert("log_size".into(), toml::Value::Integer(value as i64));
             }
-            SetConfigVariables::LogFormat { value } => {
-                let s = match value {
-                    LogFormat::Legacy => "legacy",
-                    LogFormat::Simple => "simple",
-                    LogFormat::Json => "json",
-                };
-                settings.insert("log_format".into(), toml::Value::String(s.to_string()));
+            SetConfigVariables::LogFormat { } => {
+                let log_formats: Vec<&str> = vec!["Legacy", "Simple", "Json"];
+                let log_format = Select::new("Select a log format", log_formats)
+                .prompt()
+                .map_err(|e| anyhow!("{}", e))?
+                .to_lowercase();
+            
+                settings.insert("log_format".into(), toml::Value::String(log_format.to_string().to_lowercase()));
             }
         }
-
-        std::fs::write(CONFIG_FILE, toml::to_string_pretty(&root)?)?;
+        let write_result = std::fs::write(CONFIG_FILE, toml::to_string_pretty(&root)?);
+        if write_result.is_err() {
+            return Err(anyhow!("Failed to save config to {}", CONFIG_FILE));
+        } else {
+        println!("Config successfully saved to {}", CONFIG_FILE);
+        }
         Ok(())
     }
 

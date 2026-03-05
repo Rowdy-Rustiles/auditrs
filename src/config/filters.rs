@@ -1,12 +1,15 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
 use crate::config::{AuditFilter, Filters, FILTERS_FILE, State};
 use crate::parser::audit_types::RecordType;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
+use std::io::BufRead;
 use std::path::Path;
 use strum::IntoEnumIterator;
 use toml;
+
+const ACTIONS: &[&str] = &["allow", "block"];
 
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for autocomplete).
@@ -144,8 +147,7 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
         return Err(anyhow!("record type cannot be empty"));
     }
 
-    let filter_actions: Vec<&str> = vec!["allow", "block"];
-    let action = Select::new("Select an action for this record type", filter_actions)
+    let action = Select::new("Select an action for this record type", ACTIONS.to_vec())
         .prompt()
         .map_err(|e| anyhow!("{}", e))?
         .to_lowercase();
@@ -215,12 +217,213 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         .to_string()
         .to_lowercase();
 
-    let filter_actions: Vec<&str> = vec!["allow", "block"];
-    let action = Select::new("Select new action for this record type", filter_actions)
+    let action = Select::new("Select new action for this record type", ACTIONS.to_vec())
         .prompt()
         .map_err(|e| anyhow!("{}", e))?
         .to_lowercase();
 
     let filter = AuditFilter { record_type, action };
     set_filter(filter)
+}
+
+fn validate_record_type(input: &str) -> bool {
+    RecordType::iter().any(|rt| rt.as_audit_str().eq_ignore_ascii_case(input.trim()))
+}
+
+fn validate_action(input: &str) -> bool {
+    ACTIONS.contains(&input.trim().to_lowercase().as_str())
+}
+
+fn validate_and_build_filter(
+    record_type: &str,
+    action: &str,
+    location: &str,
+) -> Result<AuditFilter> {
+    let record_type = record_type.trim();
+    let action = action.trim();
+
+    if record_type.is_empty() {
+        return Err(anyhow!("{}: record_type is empty", location));
+    }
+    if action.is_empty() {
+        return Err(anyhow!("{}: action is empty", location));
+    }
+    if !validate_record_type(record_type) {
+        return Err(anyhow!(
+            "{}: unknown record type '{}' (see valid types with `auditrs filter add`)",
+            location,
+            record_type
+        ));
+    }
+    if !validate_action(action) {
+        return Err(anyhow!(
+            "{}: invalid action '{}' (expected 'allow' or 'block')",
+            location,
+            action
+        ));
+    }
+
+    Ok(AuditFilter {
+        record_type: record_type.to_lowercase(),
+        action: action.to_lowercase(),
+    })
+}
+
+fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
+    let root: toml::Value = toml::from_str(content)
+        .with_context(|| format!("failed to parse '{}' as TOML", path.display()))?;
+
+    let filters_array = root
+        .get("filters")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!(
+            "'{}': missing [[filters]] array at top level",
+            path.display()
+        ))?;
+
+    let mut filters = Vec::new();
+    let mut errors = Vec::new();
+
+    for (i, entry) in filters_array.iter().enumerate() {
+        let location = format!("{}:filters[{}]", path.display(), i);
+        let table = match entry.as_table() {
+            Some(t) => t,
+            None => {
+                errors.push(format!("{}: entry is not a table", location));
+                continue;
+            }
+        };
+
+        let record_type = match table.get("record_type").and_then(|v| v.as_str()) {
+            Some(s) => s,
+            None => {
+                errors.push(format!("{}: missing or non-string 'record_type' field", location));
+                continue;
+            }
+        };
+
+        let action = match table.get("action").and_then(|v| v.as_str()) {
+            Some(s) => s,
+            None => {
+                errors.push(format!("{}: missing or non-string 'action' field", location));
+                continue;
+            }
+        };
+
+        match validate_and_build_filter(record_type, action, &location) {
+            Ok(f) => filters.push(f),
+            Err(e) => errors.push(e.to_string()),
+        }
+    }
+
+    if !errors.is_empty() {
+        let summary = errors.join("\n  ");
+        return Err(anyhow!(
+            "import failed with {} error(s):\n  {}",
+            errors.len(),
+            summary
+        ));
+    }
+
+    Ok(filters)
+}
+
+fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
+    let reader = std::io::BufReader::new(content.as_bytes());
+    let mut filters = Vec::new();
+    let mut errors = Vec::new();
+    let mut in_block_comment = false;
+
+    for (line_num, line) in reader.lines().enumerate() {
+        let line = line?;
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("/*") {
+            in_block_comment = true;
+            if trimmed.ends_with("*/") {
+                in_block_comment = false;
+            }
+            continue;
+        }
+        if in_block_comment {
+            if trimmed.ends_with("*/") {
+                in_block_comment = false;
+            }
+            continue;
+        }
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let location = format!("{}:{}", path.display(), line_num + 1);
+
+        let (record_type, action) = match trimmed.split_once(':') {
+            Some(pair) => pair,
+            None => {
+                errors.push(format!(
+                    "{}: invalid syntax '{}' (expected 'record_type: action')",
+                    location, trimmed
+                ));
+                continue;
+            }
+        };
+
+        match validate_and_build_filter(record_type, action, &location) {
+            Ok(f) => filters.push(f),
+            Err(e) => errors.push(e.to_string()),
+        }
+    }
+
+    if in_block_comment {
+        errors.push(format!("{}: unterminated block comment (missing closing */)", path.display()));
+    }
+
+    if !errors.is_empty() {
+        let summary = errors.join("\n  ");
+        return Err(anyhow!(
+            "import failed with {} error(s):\n  {}",
+            errors.len(),
+            summary
+        ));
+    }
+
+    Ok(filters)
+}
+
+/// Import filters from an external file (.toml or .ars format).
+pub fn import_filters(file: &str) -> Result<()> {
+    let path = Path::new(file);
+    if !path.exists() {
+        return Err(anyhow!("file does not exist: {}", file));
+    }
+
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read '{}'", path.display()))?;
+
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+    let filters = match extension {
+        "toml" => import_from_toml(&content, path)?,
+        "ars" => import_from_ars(&content, path)?,
+        other => {
+            return Err(anyhow!(
+                "unsupported file extension '.{}' (expected .toml or .ars)",
+                other
+            ));
+        }
+    };
+
+    if filters.is_empty() {
+        println!("No filters found in '{}'", path.display());
+        return Ok(());
+    }
+
+    let count = filters.len();
+    for filter in filters {
+        set_filter(filter)?;
+    }
+
+    println!("Successfully imported {} filter(s) from '{}'", count, path.display());
+    Ok(())
 }

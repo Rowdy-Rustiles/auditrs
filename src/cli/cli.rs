@@ -216,13 +216,6 @@ fn build_config() -> ClapCommand {
                 .subcommand(
                     ClapCommand::new("format")
                         .about("Set the output format")
-                        .arg(
-                            Arg::new("value")
-                                .value_name("VALUE")
-                                .required(true)
-                                .value_parser(["legacy", "simple", "json"])
-                                .help("New output format"),
-                        ),
                 )
                 .arg_required_else_help(true),
         )
@@ -231,7 +224,7 @@ fn build_config() -> ClapCommand {
 
 fn build_filter() -> ClapCommand {
     ClapCommand::new("filter")
-        .about("Manage log filters")
+        .about("Commands for managing log filters\nDocumentation about the record types that can be used in filters can be\nfound at: https://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md")
         .subcommand(
             ClapCommand::new("get").about("Show current filters").arg(
                 Arg::new("value")
@@ -240,12 +233,19 @@ fn build_filter() -> ClapCommand {
                     .help("Optional single value to filter by"),
             ),
         )
-        .subcommand(ClapCommand::new("add").about("Add a filter rule"))
+        .subcommand(ClapCommand::new("add").about("Add a filter rule for a record type defined in:\nhttps://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md"))
         .subcommand(
             ClapCommand::new("remove")
                 .about("Remove a filter rule")
                 .arg(Arg::new("value").value_name("VALUE").required(false).help(
                     "Record type to remove; omit for interactive choice from existing filters",
+                )),
+        )
+        .subcommand(
+            ClapCommand::new("import")
+                .about("Import filters from a file")
+                .arg(Arg::new("file").value_name("FILE").required(true).help(
+                    "File to import filters from (.ars, .toml, .rules)",
                 )),
         )
         .arg_required_else_help(true)

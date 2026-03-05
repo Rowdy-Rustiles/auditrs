@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use clap::ArgMatches;
 
 use crate::config::{
-    add_filter_interactive, get_config, get_filters, remove_filter_interactive, set_config,
-    update_filter_interactive, GetConfigVariables, LogFormat, SetConfigVariables, State,
+    add_filter_interactive, get_config, get_filters, import_filters, remove_filter_interactive,
+    set_config, update_filter_interactive, GetConfigVariables, LogFormat, SetConfigVariables, State,
 };
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
 
@@ -107,11 +107,7 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
             set_config(SetConfigVariables::LogSize { value }).map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("format", m)) => {
-            let s = m.get_one::<String>("value").context("missing value")?;
-            let value = s.parse().map_err(|e: String| {
-                anyhow::anyhow!("format must be legacy, simple, or json: {}", e)
-            })?;
-            set_config(SetConfigVariables::LogFormat { value })
+            set_config(SetConfigVariables::LogFormat)
                 .map_err(|e| anyhow::anyhow!("{}", e))
         }
         _ => Ok(()),
@@ -124,6 +120,12 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
         Some(("add", _sub_m)) => add_filter_interactive(state),
         Some(("update", _sub_m)) => update_filter_interactive(state),
         Some(("remove", _sub_m)) => remove_filter_interactive(state),
+        Some(("import", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            import_filters(file)
+        }
         _ => unreachable!("cli implementation should prevent this"),
     }
 }
