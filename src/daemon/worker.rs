@@ -1,17 +1,16 @@
 use anyhow::Result;
 use std::time::Duration;
 use tokio::signal;
-use tokio::signal::unix::{SignalKind, signal};
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
+use crate::config::load_config;
 use crate::correlator::{AuditEvent, Correlator};
 use crate::daemon::daemon;
 use crate::netlink::{NetlinkAuditTransport, RawAuditRecord};
 use crate::parser::ParsedAuditRecord;
 use crate::writer::AuditLogWriter;
-use crate::config::load_config;
-
 
 pub async fn run_worker() -> Result<()> {
     let config = load_config().unwrap();

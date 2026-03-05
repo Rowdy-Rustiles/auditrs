@@ -1,0 +1,11 @@
+[[filters]]
+action = "block"
+record_type = "syscall"
+
+[[filters]]
+action = "block"
+record_type = "add_group"
+
+[[filters]]
+action = "block"
+record_type = "cwd"

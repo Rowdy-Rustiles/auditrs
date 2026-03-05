@@ -9,6 +9,7 @@ pub fn build_cli() -> ClapCommand {
         .subcommand(ClapCommand::new("stop").about("Stop the running auditrs daemon"))
         .subcommand(ClapCommand::new("reboot").about("Restart the auditrs daemon (stop + start)"))
         .subcommand(ClapCommand::new("status").about("Show whether the daemon is running"))
+        .subcommand(build_filter())
         .subcommand(build_dump())
         .subcommand(build_search())
         .subcommand(build_report())
@@ -187,7 +188,7 @@ fn build_config() -> ClapCommand {
                 .about("Read config values")
                 .subcommand(ClapCommand::new("directory").about("Get the current log directory"))
                 .subcommand(ClapCommand::new("size").about("Get the current log size limit"))
-                .subcommand(ClapCommand::new("format").about("Get the current output format"))
+                .subcommand(ClapCommand::new("format").about("Get the current output format")),
         )
         .subcommand(
             ClapCommand::new("set")
@@ -225,45 +226,27 @@ fn build_config() -> ClapCommand {
                 )
                 .arg_required_else_help(true),
         )
+        .arg_required_else_help(true)
+}
+
+fn build_filter() -> ClapCommand {
+    ClapCommand::new("filter")
+        .about("Manage log filters")
         .subcommand(
-            ClapCommand::new("filter")
-                .about("Manage log filters")
-                .subcommand(
-                    ClapCommand::new("get").about("Show current filters").arg(
-                        Arg::new("value")
-                            .value_name("VALUE")
-                            .required(false)
-                            .help("Optional single value to filter by"),
-                    ),
-                )
-                .subcommand(
-                    ClapCommand::new("add")
-                        .about("Add a filter rule")
-                )
-                .subcommand(
-                    ClapCommand::new("remove")
-                        .about("Remove a filter rule (interactive with autocomplete if no value given)")
-                        .arg(
-                            Arg::new("value")
-                                .value_name("VALUE")
-                                .required(false)
-                                .help("Record type to remove; omit for interactive choice from existing filters"),
-                        ),
-                )
-                .subcommand(
-                    ClapCommand::new("import")
-                        .about("Import filter rules from a file")
-                        .arg(
-                            Arg::new("file")
-                                .value_name("FILE")
-                                .required(true)
-                                .help("Path to file containing filter rules"),
-                        ),
-                )
-                .subcommand(
-                    ClapCommand::new("update").about("Update an existing filter rule (prompts for record type and action)"),
-                )
-                .arg_required_else_help(true),
+            ClapCommand::new("get").about("Show current filters").arg(
+                Arg::new("value")
+                    .value_name("VALUE")
+                    .required(false)
+                    .help("Optional single value to filter by"),
+            ),
+        )
+        .subcommand(ClapCommand::new("add").about("Add a filter rule"))
+        .subcommand(
+            ClapCommand::new("remove")
+                .about("Remove a filter rule")
+                .arg(Arg::new("value").value_name("VALUE").required(false).help(
+                    "Record type to remove; omit for interactive choice from existing filters",
+                )),
         )
         .arg_required_else_help(true)
 }

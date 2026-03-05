@@ -1,11 +1,11 @@
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
-use inquire::{
-    autocompletion::{Autocomplete, Replacement},
-    CustomUserError, Text,
-    validator::{StringValidator, Validation}
-};
 use crate::parser::audit_types::RecordType;
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
+use inquire::{
+    CustomUserError, Text,
+    autocompletion::{Autocomplete, Replacement},
+    validator::{StringValidator, Validation},
+};
 use strum::IntoEnumIterator;
 
 /// Autocompleter for a fixed list of strings (e.g. existing filter record types from config).
@@ -29,7 +29,9 @@ impl StringListAutoCompleter {
             .options
             .iter()
             .filter_map(|s| {
-                matcher.fuzzy_match(s, input).map(|score| (s.clone(), score))
+                matcher
+                    .fuzzy_match(s, input)
+                    .map(|score| (s.clone(), score))
             })
             .collect();
         matches.sort_by(|a, b| b.1.cmp(&a.1));
@@ -105,7 +107,11 @@ impl Autocomplete for RecordTypeAutoCompleter {
         self.update_input(input)?;
 
         let matches = self.fuzzy_sort(input);
-        Ok(matches.into_iter().take(25).map(|(record_type, _)| record_type).collect())
+        Ok(matches
+            .into_iter()
+            .take(25)
+            .map(|(record_type, _)| record_type)
+            .collect())
     }
 
     fn get_completion(
