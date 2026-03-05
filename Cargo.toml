@@ -8,7 +8,7 @@ default-run="auditrs"
 
 [dependencies]
 libc = "0.2.178"
-strum = "0.27.2"
+strum = { version = "0.27.2", features = ["derive"] }
 strum_macros = "0.27.2"
 futures = "0.3"
 audit = "0.7.3"
