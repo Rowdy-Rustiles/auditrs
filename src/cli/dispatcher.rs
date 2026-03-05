@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use clap::ArgMatches;
 
 use crate::config::{
-    add_or_update_filter_interactive, get_config, remove_filter, set_config,
-    GetConfigVariables, LogFormat, SetConfigVariables,
+    add_filter_interactive, get_config, get_filters, remove_filter, remove_filter_interactive,
+    set_config, update_filter_interactive, GetConfigVariables, LogFormat, SetConfigVariables,
 };
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
 
@@ -119,18 +119,25 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
     }
 }
 
+/// TODO: should it be `auditrs filter` or `auditrs config filter`? im starting to lean towards the former
 fn handle_config_filter(matches: &ArgMatches) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _)) => {
-            get_config(Some(GetConfigVariables::LogFilters))
+            get_filters()
                 .map_err(|e| anyhow::anyhow!("{}", e))
         }
-        Some(("add", _)) | Some(("update", _)) => {
-            add_or_update_filter_interactive().map_err(|e| anyhow::anyhow!("{}", e))
+        Some(("add", _)) => {
+            add_filter_interactive().map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("update", _)) => {
+            update_filter_interactive().map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("remove", m)) => {
-            let record_type = m.get_one::<String>("value").context("missing value")?.clone();
-            remove_filter(record_type).map_err(|e| anyhow::anyhow!("{}", e))
+            match m.get_one::<String>("value") {
+                Some(record_type) => remove_filter(record_type.clone()),
+                None => remove_filter_interactive(),
+            }
+            .map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("import", _)) => {
             println!("Import filters, WIP");

@@ -2,10 +2,11 @@ use config::Config;
 use inquire::Select;
 use serde::Deserialize;
 use crate::config::{CONFIG_FILE, AuditConfig, SetConfigVariables, GetConfigVariables, LogFormat};
-use crate::config::input_utils::RecordTypeAutoCompleter;
+use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
 use crate::parser::audit_types::RecordType;
 use inquire::{validator::Validation, formatter::StringFormatter};
 use strum::IntoEnumIterator;
+use anyhow::{anyhow, Result};
 
 impl std::str::FromStr for LogFormat {
     type Err = String;
@@ -20,24 +21,27 @@ impl std::str::FromStr for LogFormat {
 }
 
 /// TODO: initialize default config file if one doesn't exist
-pub fn load_config() -> Result<AuditConfig, Box<dyn std::error::Error>> {
+/// also, store the config in memory, should be small enough to not cause performance concerns,
+/// therefore, we can avoid the IO costs of reading the config file on every operation
+pub fn load_config() -> Result<AuditConfig> {
     let config = Config::builder()
         .add_source(config::File::new("Config", config::FileFormat::Toml))
-        .build()?;
+        .build()
+        .map_err(|e| anyhow!("{}", e))?;
 
     // The TOML file has a top-level `[settings]` table; we map that into `AuditConfig`.
-    let settings = config.get::<AuditConfig>("settings")?;
+    let settings = config.get::<AuditConfig>("settings").map_err(|e| anyhow!("{}", e))?;
     Ok(settings)
 }
 
-pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Error>> {
+pub fn set_config(key: SetConfigVariables) -> Result<()> {
     let content = std::fs::read_to_string(CONFIG_FILE)?;
     let mut root: toml::Table = toml::from_str(&content)?;
 
     let settings = root
         .get_mut("settings")
         .and_then(|v| v.as_table_mut())
-        .ok_or("missing [settings] section")?;
+        .ok_or_else(|| anyhow!("missing [settings] section"))?;
 
     match key {
         SetConfigVariables::OutputDirectory { value } => {
@@ -82,7 +86,7 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
                         filters_array.push(toml::Value::Table(filter_table));
                     }
                 } else {
-                    return Err("settings.filters is not an array".into());
+                    return Err(anyhow!("settings.filters is not an array"));
                 }
             } else {
                 settings.insert(
@@ -90,6 +94,7 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
                     toml::Value::Array(vec![toml::Value::Table(filter_table)]),
                 );
             }
+            println!("Filter successfully set");
         }
         SetConfigVariables::RemoveFilter { record_type } => {
             if let Some(filters_value) = settings.get_mut("filters") {
@@ -103,6 +108,7 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
                     });
                 }
             }
+            println!("Filter successfully removed");
         }
     }
 
@@ -111,7 +117,7 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
 }
 
 /// Print config values (used by `config get`).
-pub fn get_config(key: Option<GetConfigVariables>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn get_config(key: Option<GetConfigVariables>) -> Result<()> {
     let config = load_config()?;
     match key {
         Some(GetConfigVariables::OutputDirectory) => {
@@ -125,9 +131,26 @@ pub fn get_config(key: Option<GetConfigVariables>) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-/// Add or update a single filter via interactive prompts 
-/// TODO: Update should probably be a separate function that checks if the filter already exists and only updates it if it does.
-pub fn add_or_update_filter_interactive() -> Result<(), Box<dyn std::error::Error>> {
+
+/// TODO: if this file gets too longer, we'll split the config files into multiple files by CLI subcommand
+
+/// Gets all filters from the config file
+pub fn get_filters() -> Result<()> {
+    let config = load_config()?;
+    let filters = config.filters.as_slice();
+    if filters.is_empty() {
+        println!("No filters defined");
+    } else {
+        println!("Filters:");
+        for filter in filters {
+            println!("    {}: {}", filter.record_type, filter.action);
+        }
+    }
+    Ok(())
+}
+
+/// Add a single filter via interactive prompts 
+pub fn add_filter_interactive() -> Result<()> {
     let record_type = inquire::Text::new("Enter a record type to filter on:")
         .with_autocomplete(RecordTypeAutoCompleter::default())
         .with_validator(|input: &str| {
@@ -144,18 +167,18 @@ pub fn add_or_update_filter_interactive() -> Result<(), Box<dyn std::error::Erro
         })
         .with_formatter(&|i| i.to_lowercase())
         .prompt()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| anyhow::anyhow!("{}", e))?
         .trim()
         .to_string()
         .to_lowercase();
     if record_type.is_empty() {
-        return Err("record type cannot be empty".into());
+        return Err(anyhow!("record type cannot be empty"));
     }
 
     let filter_actions: Vec<&str> = vec!["Allow", "Block"];
     let action = Select::new("Select an action for this record type", filter_actions)
         .prompt()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| anyhow::anyhow!("{}", e))?
         .to_lowercase();
 
     set_config(SetConfigVariables::LogFilters {
@@ -164,7 +187,73 @@ pub fn add_or_update_filter_interactive() -> Result<(), Box<dyn std::error::Erro
     })
 }
 
-/// Remove a filter by record type
-pub fn remove_filter(record_type: String) -> Result<(), Box<dyn std::error::Error>> {
+/// Remove a filter by record type (direct; use for CLI when value is provided).
+pub fn remove_filter(record_type: String) -> Result<()> {
     set_config(SetConfigVariables::RemoveFilter { record_type })
+}
+
+/// Remove a filter via interactive prompt with fuzzy autocomplete over existing filters only.
+pub fn remove_filter_interactive() -> Result<()> {
+    let config = load_config()?;
+    let existing = config.filters.record_types();
+    if existing.is_empty() {
+        return Err(anyhow!("No filters defined; nothing to remove."));
+    }
+    let completer = StringListAutoCompleter::new(existing.clone());
+    let record_type = inquire::Text::new("Select a record type to remove:")
+        .with_autocomplete(completer)
+        .with_validator(move |input: &str| {
+            let trimmed = input.trim().to_lowercase();
+            if existing.iter().any(|s| s.eq_ignore_ascii_case(&trimmed)) {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(
+                    "Please choose one of the existing filter record types (use suggestions).".into(),
+                ))
+            }
+        })
+        .with_formatter(&|i| i.to_lowercase())
+        .prompt()
+        .map_err(|e| anyhow::anyhow!("{}", e))?
+        .trim()
+        .to_string()
+        .to_lowercase();
+    set_config(SetConfigVariables::RemoveFilter { record_type })
+}
+
+/// Update an existing filter's action via interactive prompt; record type chosen from current config only.
+pub fn update_filter_interactive() -> Result<()> {
+    let config = load_config()?;
+    let existing = config.filters.record_types();
+    if existing.is_empty() {
+        return Err(anyhow!("No filters defined; add a filter first or use 'filter add'."));
+    }
+    let completer = StringListAutoCompleter::new(existing.clone());
+    let record_type = inquire::Text::new("Select a record type to update:")
+        .with_autocomplete(completer)
+        .with_validator(move |input: &str| {
+            let trimmed = input.trim().to_lowercase();
+            if existing.iter().any(|s| s.eq_ignore_ascii_case(&trimmed)) {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(
+                    "Please choose one of the existing filter record types (use suggestions).".into(),
+                ))
+            }
+        })
+        .with_formatter(&|i| i.to_lowercase())
+        .prompt()
+        .map_err(|e| anyhow::anyhow!("{}", e))?
+        .trim()
+        .to_string()
+        .to_lowercase();
+    let filter_actions: Vec<&str> = vec!["Allow", "Block"];
+    let action = Select::new("Select new action for this record type", filter_actions)
+        .prompt()
+        .map_err(|e| anyhow::anyhow!("{}", e))?
+        .to_lowercase();
+    set_config(SetConfigVariables::LogFilters {
+        record_type,
+        action,
+    })
 }

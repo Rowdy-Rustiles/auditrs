@@ -242,12 +242,12 @@ fn build_config() -> ClapCommand {
                 )
                 .subcommand(
                     ClapCommand::new("remove")
-                        .about("Remove a filter rule")
+                        .about("Remove a filter rule (interactive with autocomplete if no value given)")
                         .arg(
                             Arg::new("value")
                                 .value_name("VALUE")
-                                .required(true)
-                                .help("Filter value to remove"),
+                                .required(false)
+                                .help("Record type to remove; omit for interactive choice from existing filters"),
                         ),
                 )
                 .subcommand(

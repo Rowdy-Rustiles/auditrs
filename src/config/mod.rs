@@ -10,6 +10,18 @@ const CONFIG_FILE: &str = "Config.toml";
 #[derive(Debug, Deserialize)]
 struct Filters(Vec<AuditFilter>);
 
+impl Filters {
+    /// Returns the list of record types currently defined in the config (for autocomplete).
+    pub fn record_types(&self) -> Vec<String> {
+        self.0.iter().map(|f| f.record_type.clone()).collect()
+    }
+
+    /// Returns the underlying filter list.
+    pub fn as_slice(&self) -> &[AuditFilter] {
+        &self.0
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub enum GetConfigVariables {
     OutputDirectory,
@@ -40,8 +52,8 @@ pub struct AuditConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct AuditFilter {
-    record_type: String,
-    action: String,
+    pub record_type: String,
+    pub action: String,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
