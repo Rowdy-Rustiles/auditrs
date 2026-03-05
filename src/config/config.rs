@@ -1,7 +1,11 @@
 use config::Config;
 use inquire::Select;
 use serde::Deserialize;
-use crate::config::CONFIG_FILE;
+use crate::config::{CONFIG_FILE, AuditConfig, SetConfigVariables, GetConfigVariables, LogFormat};
+use crate::config::input_utils::RecordTypeAutoCompleter;
+use crate::parser::audit_types::RecordType;
+use inquire::{validator::Validation, formatter::StringFormatter};
+use strum::IntoEnumIterator;
 
 impl std::str::FromStr for LogFormat {
     type Err = String;
@@ -15,7 +19,7 @@ impl std::str::FromStr for LogFormat {
     }
 }
 
-
+/// TODO: initialize default config file if one doesn't exist
 pub fn load_config() -> Result<AuditConfig, Box<dyn std::error::Error>> {
     let config = Config::builder()
         .add_source(config::File::new("Config", config::FileFormat::Toml))
@@ -55,6 +59,9 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
             action,
         } => {
             let mut filter_table = toml::map::Map::new();
+            // I literally have no idea how action is always inserted above record type in the config file.
+            // switching these two lines around doesnt do anything
+            // it is what it is
             filter_table.insert("record_type".into(), toml::Value::String(record_type.clone()));
             filter_table.insert("action".into(), toml::Value::String(action.clone()));
 
@@ -68,8 +75,8 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
                             .unwrap_or(false)
                     }) {
                         if let Some(table) = existing.as_table_mut() {
-                            table.insert("action".into(), toml::Value::String(action));
                             table.insert("record_type".into(), toml::Value::String(record_type));
+                            table.insert("action".into(), toml::Value::String(action));
                         }
                     } else {
                         filters_array.push(toml::Value::Table(filter_table));
@@ -119,12 +126,28 @@ pub fn get_config(key: Option<GetConfigVariables>) -> Result<(), Box<dyn std::er
 }
 
 /// Add or update a single filter via interactive prompts 
+/// TODO: Update should probably be a separate function that checks if the filter already exists and only updates it if it does.
 pub fn add_or_update_filter_interactive() -> Result<(), Box<dyn std::error::Error>> {
     let record_type = inquire::Text::new("Enter a record type to filter on:")
+        .with_autocomplete(RecordTypeAutoCompleter::default())
+        .with_validator(|input: &str| {
+            let is_valid = RecordType::iter()
+                .any(|rt: RecordType| rt.as_audit_str().eq_ignore_ascii_case(input.trim()));
+
+            if is_valid {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid(
+                    "Please enter a valid record type (use suggestions)".into(),
+                ))
+            }
+        })
+        .with_formatter(&|i| i.to_lowercase())
         .prompt()
         .map_err(|e| e.to_string())?
         .trim()
-        .to_string();
+        .to_string()
+        .to_lowercase();
     if record_type.is_empty() {
         return Err("record type cannot be empty".into());
     }
