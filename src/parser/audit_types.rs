@@ -1,4 +1,5 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter, strum::EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecordType {
     /* =========================
      * Control (1000–1019)

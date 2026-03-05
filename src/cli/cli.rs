@@ -243,9 +243,16 @@ fn build_filter() -> ClapCommand {
         )
         .subcommand(
             ClapCommand::new("import")
-                .about("Import filters from a file")
+                .about("Import filters from a file (supports .ars, .toml)")
                 .arg(Arg::new("file").value_name("FILE").required(true).help(
                     "File to import filters from (.ars, .toml, .rules)",
+                )),
+        )
+        .subcommand(
+            ClapCommand::new("dump")
+                .about("Dump filters to a file (supports .ars, .toml)")
+                .arg(Arg::new("file").value_name("FILE").required(true).help(
+                    "File to dump filters to (omit file extension)"
                 )),
         )
         .arg_required_else_help(true)

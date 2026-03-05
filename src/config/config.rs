@@ -1,4 +1,4 @@
-use crate::config::{AuditConfig, CONFIG_FILE, GetConfigVariables, LogFormat, SetConfigVariables};
+use crate::config::{AuditConfig, CONFIG_FILE, GetConfigVariables, LOG_FORMATS, LogFormat, SetConfigVariables};
 use std::{fs::{OpenOptions}, io::{Write}};
 use std::path::Path;
 use anyhow::{Result, anyhow};
@@ -69,8 +69,7 @@ impl AuditConfig {
                 settings.insert("log_size".into(), toml::Value::Integer(value as i64));
             }
             SetConfigVariables::LogFormat { } => {
-                let log_formats: Vec<&str> = vec!["Legacy", "Simple", "Json"];
-                let log_format = Select::new("Select a log format", log_formats)
+                let log_format = Select::new("Select a log format", LOG_FORMATS.to_vec())
                 .prompt()
                 .map_err(|e| anyhow!("{}", e))?
                 .to_lowercase();

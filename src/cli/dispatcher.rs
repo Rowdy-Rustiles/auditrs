@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::ArgMatches;
 
 use crate::config::{
-    add_filter_interactive, get_config, get_filters, import_filters, remove_filter_interactive,
+    add_filter_interactive, dump_filters, get_config, get_filters, import_filters, remove_filter_interactive,
     set_config, update_filter_interactive, GetConfigVariables, LogFormat, SetConfigVariables, State,
 };
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
@@ -125,6 +125,12 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
                 .get_one::<String>("file")
                 .context("missing file argument")?;
             import_filters(file)
+        }
+        Some(("dump", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            dump_filters(file, state)
         }
         _ => unreachable!("cli implementation should prevent this"),
     }
