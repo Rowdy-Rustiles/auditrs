@@ -1,15 +1,17 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
-use crate::config::{AuditFilter, Filters, FILTERS_FILE, State};
+use crate::config::{ACTIONS, AuditFilter, FILTER_FILE_EXTENSIONS, Filters, FILTERS_FILE, State};
 use crate::parser::audit_types::RecordType;
 use anyhow::{anyhow, Context, Result};
+use std::fs::OpenOptions;
+use std::str::FromStr;
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 use std::path::Path;
 use strum::IntoEnumIterator;
+use crate::utils::current_utc_string;
 use toml;
 
-const ACTIONS: &[&str] = &["allow", "block"];
 
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for autocomplete).
@@ -226,14 +228,6 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
     set_filter(filter)
 }
 
-fn validate_record_type(input: &str) -> bool {
-    RecordType::iter().any(|rt| rt.as_audit_str().eq_ignore_ascii_case(input.trim()))
-}
-
-fn validate_action(input: &str) -> bool {
-    ACTIONS.contains(&input.trim().to_lowercase().as_str())
-}
-
 fn validate_and_build_filter(
     record_type: &str,
     action: &str,
@@ -248,14 +242,16 @@ fn validate_and_build_filter(
     if action.is_empty() {
         return Err(anyhow!("{}: action is empty", location));
     }
-    if !validate_record_type(record_type) {
-        return Err(anyhow!(
+
+    let parsed_rt = RecordType::from_str(&record_type.to_uppercase()).map_err(|_| {
+        anyhow!(
             "{}: unknown record type '{}' (see valid types with `auditrs filter add`)",
             location,
             record_type
-        ));
-    }
-    if !validate_action(action) {
+        )
+    })?;
+
+    if !ACTIONS.contains(&action.to_lowercase().as_str()) {
         return Err(anyhow!(
             "{}: invalid action '{}' (expected 'allow' or 'block')",
             location,
@@ -264,13 +260,47 @@ fn validate_and_build_filter(
     }
 
     Ok(AuditFilter {
-        record_type: record_type.to_lowercase(),
+        record_type: parsed_rt.as_audit_str().to_lowercase(),
         action: action.to_lowercase(),
     })
 }
 
+/// Strip `/* ... */` block comments from raw file content (works across multiple lines).
+fn strip_block_comments(content: &str) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut chars = content.chars().peekable();
+
+    while let Some(&c) = chars.peek() {
+        if c == '/' {
+            chars.next();
+            if chars.peek() == Some(&'*') {
+                chars.next();
+                let mut closed = false;
+                while let Some(inner) = chars.next() {
+                    if inner == '*' && chars.peek() == Some(&'/') {
+                        chars.next();
+                        closed = true;
+                        break;
+                    }
+                }
+                if !closed {
+                    eprintln!("warning: unterminated block comment (missing closing */)");
+                }
+            } else {
+                result.push('/');
+            }
+        } else {
+            result.push(c);
+            chars.next();
+        }
+    }
+
+    result
+}
+
 fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
-    let root: toml::Value = toml::from_str(content)
+    let cleaned = strip_block_comments(content);
+    let root: toml::Value = toml::from_str(&cleaned)
         .with_context(|| format!("failed to parse '{}' as TOML", path.display()))?;
 
     let filters_array = root
@@ -282,14 +312,13 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         ))?;
 
     let mut filters = Vec::new();
-    let mut errors = Vec::new();
 
     for (i, entry) in filters_array.iter().enumerate() {
         let location = format!("{}:filters[{}]", path.display(), i);
         let table = match entry.as_table() {
             Some(t) => t,
             None => {
-                errors.push(format!("{}: entry is not a table", location));
+                eprintln!("warning: {}: entry is not a table, skipping", location);
                 continue;
             }
         };
@@ -297,7 +326,7 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         let record_type = match table.get("record_type").and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
-                errors.push(format!("{}: missing or non-string 'record_type' field", location));
+                eprintln!("warning: {}: missing or non-string 'record_type' field, skipping", location);
                 continue;
             }
         };
@@ -305,52 +334,28 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         let action = match table.get("action").and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
-                errors.push(format!("{}: missing or non-string 'action' field", location));
+                eprintln!("warning: {}: missing or non-string 'action' field, skipping", location);
                 continue;
             }
         };
 
         match validate_and_build_filter(record_type, action, &location) {
             Ok(f) => filters.push(f),
-            Err(e) => errors.push(e.to_string()),
+            Err(e) => eprintln!("warning: {}, skipping", e),
         }
-    }
-
-    if !errors.is_empty() {
-        let summary = errors.join("\n  ");
-        return Err(anyhow!(
-            "import failed with {} error(s):\n  {}",
-            errors.len(),
-            summary
-        ));
     }
 
     Ok(filters)
 }
 
 fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
-    let reader = std::io::BufReader::new(content.as_bytes());
+    let cleaned = strip_block_comments(content);
+    let reader = std::io::BufReader::new(cleaned.as_bytes());
     let mut filters = Vec::new();
-    let mut errors = Vec::new();
-    let mut in_block_comment = false;
 
     for (line_num, line) in reader.lines().enumerate() {
         let line = line?;
         let trimmed = line.trim();
-
-        if trimmed.starts_with("/*") {
-            in_block_comment = true;
-            if trimmed.ends_with("*/") {
-                in_block_comment = false;
-            }
-            continue;
-        }
-        if in_block_comment {
-            if trimmed.ends_with("*/") {
-                in_block_comment = false;
-            }
-            continue;
-        }
 
         if trimmed.is_empty() {
             continue;
@@ -361,31 +366,15 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         let (record_type, action) = match trimmed.split_once(':') {
             Some(pair) => pair,
             None => {
-                errors.push(format!(
-                    "{}: invalid syntax '{}' (expected 'record_type: action')",
-                    location, trimmed
-                ));
+                eprintln!("warning: {}: invalid syntax '{}' (expected 'record_type: action'), skipping", location, trimmed);
                 continue;
             }
         };
 
         match validate_and_build_filter(record_type, action, &location) {
             Ok(f) => filters.push(f),
-            Err(e) => errors.push(e.to_string()),
+            Err(e) => eprintln!("warning: {}, skipping", e),
         }
-    }
-
-    if in_block_comment {
-        errors.push(format!("{}: unterminated block comment (missing closing */)", path.display()));
-    }
-
-    if !errors.is_empty() {
-        let summary = errors.join("\n  ");
-        return Err(anyhow!(
-            "import failed with {} error(s):\n  {}",
-            errors.len(),
-            summary
-        ));
     }
 
     Ok(filters)
@@ -426,4 +415,58 @@ pub fn import_filters(file: &str) -> Result<()> {
 
     println!("Successfully imported {} filter(s) from '{}'", count, path.display());
     Ok(())
+}
+
+pub fn dump_filters(file: &str, state: &State) -> Result<()> {
+    let filters = state.filters.as_slice();
+    if filters.is_empty() {
+        return Err(anyhow!("No filters defined; nothing to dump."));
+    }
+
+    let filter_file_extension = Select::new("Select a filter file format", FILTER_FILE_EXTENSIONS.to_vec())
+        .prompt()
+        .map_err(|e| anyhow!("{}", e))?
+        .to_lowercase();
+
+    // Replace any user-given extension with the selected extension from the terminal
+    let base = Path::new(file).with_extension("");
+    let path = base.with_extension(&filter_file_extension);
+
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create directory '{}'", parent.display()))?;
+        }
+    }
+
+    let mut header = String::from("/*\n\nGenerated by auditrs via CLI at ") + &current_utc_string() + "\n\n*/\n\n";
+    let content = match filter_file_extension.as_str() {
+        "toml" => to_toml_format(filters)?,
+        "ars" => to_ars_format(filters)?,
+        _ => return Err(anyhow!("Invalid filter file format")),
+    };
+
+    std::fs::write(&path, header.to_string() + &content)
+        .with_context(|| format!("failed to write '{}'", path.display()))?;
+    println!("Filters dumped to '{}'", path.display());
+    Ok(())
+}
+
+fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
+    let mut table = toml::map::Map::new();
+    table.insert("filters".into(), toml::Value::Array(filters.iter().map(|f| {
+        let mut filter_table = toml::map::Map::new();
+        filter_table.insert("record_type".into(), toml::Value::String(f.record_type.clone()));
+        filter_table.insert("action".into(), toml::Value::String(f.action.clone()));
+        toml::Value::Table(filter_table)
+    }).collect()));
+    Ok(toml::to_string_pretty(&toml::Value::Table(table))?)
+}
+
+fn to_ars_format(filters: &[AuditFilter]) -> Result<String> {
+    let mut content = String::new();
+    for filter in filters {
+        content.push_str(&format!("{}: {}\n", filter.record_type, filter.action));
+    }
+    Ok(content)
 }

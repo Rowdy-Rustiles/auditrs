@@ -6,12 +6,15 @@ pub mod state;
 pub use config::{get_config, load_config, set_config};
 pub use filters::{
     add_filter_interactive, get_filters, import_filters, load_filters, remove_filter_interactive,
-    update_filter_interactive,
+    update_filter_interactive, dump_filters,
 };
 use serde::Deserialize;
 
 pub const CONFIG_FILE: &str = "Config.toml";
 pub const FILTERS_FILE: &str = "Filters.toml";
+pub const FILTER_FILE_EXTENSIONS: &[&str] = &["toml", "ars"];
+pub const ACTIONS: &[&str] = &["allow", "block"];
+pub const LOG_FORMATS: &[&str] = &["Legacy", "Simple", "Json"];
 
 #[derive(Debug)]
 pub struct State {

@@ -19,6 +19,11 @@ pub fn systemtime_to_utc_string(systemtime: SystemTime) -> String {
     dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
 }
 
+pub fn current_utc_string() -> String {
+    let dt: DateTime<Utc> = Utc::now();
+    dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
+}
+
 pub fn systemtime_to_timestamp_string(systime: SystemTime) -> Result<String> {
     let duration = systime.duration_since(UNIX_EPOCH)?;
     Ok(format!(
