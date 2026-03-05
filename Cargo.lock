@@ -118,6 +118,7 @@ dependencies = [
  "daemonize",
  "env_logger",
  "futures",
+ "fuzzy-matcher",
  "inquire",
  "libc",
  "netlink-packet-core",
