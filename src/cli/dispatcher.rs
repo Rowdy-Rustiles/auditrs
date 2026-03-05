@@ -1,7 +1,10 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::ArgMatches;
 
-use crate::config::{get_config, GetConfigVariables};
+use crate::config::{
+    add_or_update_filter_interactive, get_config, remove_filter, set_config,
+    GetConfigVariables, LogFormat, SetConfigVariables,
+};
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
 
 /// Top-level entry point for handling CLI subcommands
@@ -69,15 +72,69 @@ fn handle_report(_matches: &ArgMatches) -> Result<()> {
 
 fn handle_config(matches: &ArgMatches) -> Result<()> {
     match matches.subcommand() {
-        Some(("get", sub_m)) => {
-            let key = match sub_m.subcommand_name() {
+        Some(("get", get_m)) => {
+            let key = match get_m.subcommand_name() {
                 Some("directory") => Some(GetConfigVariables::OutputDirectory),
                 Some("size") => Some(GetConfigVariables::LogSize),
                 Some("format") => Some(GetConfigVariables::LogFormat),
                 Some("filters") => Some(GetConfigVariables::LogFilters),
                 _ => None,
             };
-            get_config(key)
+            get_config(key).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("set", set_m)) => handle_config_set(set_m),
+        Some(("filter", filter_m)) => handle_config_filter(filter_m),
+        _ => Ok(()),
+    }
+}
+
+fn handle_config_set(matches: &ArgMatches) -> Result<()> {
+    match matches.subcommand() {
+        Some(("directory", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .clone();
+            set_config(SetConfigVariables::OutputDirectory { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("size", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .parse()
+                .context("size must be a number")?;
+            set_config(SetConfigVariables::LogSize { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("format", m)) => {
+            let s = m.get_one::<String>("value").context("missing value")?;
+            let value = s
+                .parse()
+                .map_err(|e: String| anyhow::anyhow!("format must be legacy, simple, or json: {}", e))?;
+            set_config(SetConfigVariables::LogFormat { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn handle_config_filter(matches: &ArgMatches) -> Result<()> {
+    match matches.subcommand() {
+        Some(("get", _)) => {
+            get_config(Some(GetConfigVariables::LogFilters))
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("add", _)) | Some(("update", _)) => {
+            add_or_update_filter_interactive().map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("remove", m)) => {
+            let record_type = m.get_one::<String>("value").context("missing value")?.clone();
+            remove_filter(record_type).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("import", _)) => {
+            println!("Import filters, WIP");
+            Ok(())
         }
         _ => Ok(()),
     }

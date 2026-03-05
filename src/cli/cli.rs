@@ -188,7 +188,6 @@ fn build_config() -> ClapCommand {
                 .subcommand(ClapCommand::new("directory").about("Get the current log directory"))
                 .subcommand(ClapCommand::new("size").about("Get the current log size limit"))
                 .subcommand(ClapCommand::new("format").about("Get the current output format"))
-                .subcommand(ClapCommand::new("filters").about("Get the current log filters")),
         )
         .subcommand(
             ClapCommand::new("set")
@@ -240,19 +239,6 @@ fn build_config() -> ClapCommand {
                 .subcommand(
                     ClapCommand::new("add")
                         .about("Add a filter rule")
-                        .arg(
-                            Arg::new("value")
-                                .value_name("VALUE")
-                                .required(true)
-                                .help("Filter value to add"),
-                        )
-                        .arg(
-                            Arg::new("action")
-                                .value_name("ACTION")
-                                .required(true)
-                                .value_parser(["block", "allow"])
-                                .help("Filter action"),
-                        ),
                 )
                 .subcommand(
                     ClapCommand::new("remove")
@@ -275,21 +261,7 @@ fn build_config() -> ClapCommand {
                         ),
                 )
                 .subcommand(
-                    ClapCommand::new("update")
-                        .about("Update an existing filter rule")
-                        .arg(
-                            Arg::new("value")
-                                .value_name("VALUE")
-                                .required(true)
-                                .help("Filter value to update"),
-                        )
-                        .arg(
-                            Arg::new("action")
-                                .value_name("ACTION")
-                                .required(true)
-                                .value_parser(["block", "allow"])
-                                .help("New filter action"),
-                        ),
+                    ClapCommand::new("update").about("Update an existing filter rule (prompts for record type and action)"),
                 )
                 .arg_required_else_help(true),
         )

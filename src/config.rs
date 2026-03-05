@@ -1,6 +1,8 @@
+use config::Config;
+use inquire::Select;
 use serde::Deserialize;
-use config::{Config};
-use std::io::{self, Write};
+
+const CONFIG_FILE: &str = "Config.toml";
 
 // Thin audit filters wrapper for printing extensibility
 #[derive(Debug, Deserialize)]
@@ -14,20 +16,16 @@ pub enum GetConfigVariables {
     LogFilters,
 }
 
-
 #[derive(Debug, Deserialize)]
 pub enum SetConfigVariables {
-    OutputDirectory {
-        value: String,
+    OutputDirectory { value: String },
+    LogSize { value: usize },
+    LogFormat { value: LogFormat },
+    LogFilters {
+        record_type: String,
+        action: String,
     },
-    LogSize {
-        value: usize,
-    },
-    LogFormat {
-        value: LogFormat,
-    },
-    /// Raw filter expression or YAML snippet for now
-        LogFilters 
+    RemoveFilter { record_type: String },
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,22 +39,29 @@ pub struct AuditConfig {
 #[derive(Debug, Deserialize)]
 pub struct AuditFilter {
     record_type: String,
-    action: Action,
+    action: String,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize)]
-enum LogFormat {
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
     Legacy,
     Simple,
     Json,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "lowercase")]
-enum Action {
-    Allow,
-    Block,
+impl std::str::FromStr for LogFormat {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "legacy" => Ok(LogFormat::Legacy),
+            "simple" => Ok(LogFormat::Simple),
+            "json" => Ok(LogFormat::Json),
+            _ => Err(format!("unknown format: {}", s)),
+        }
+    }
 }
+
 
 pub fn load_config() -> Result<AuditConfig, Box<dyn std::error::Error>> {
     let config = Config::builder()
@@ -69,16 +74,13 @@ pub fn load_config() -> Result<AuditConfig, Box<dyn std::error::Error>> {
 }
 
 pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Error>> {
-    let file_path = "config.toml";
-    let content = std::fs::read_to_string(file_path)?;
+    let content = std::fs::read_to_string(CONFIG_FILE)?;
     let mut root: toml::Table = toml::from_str(&content)?;
 
     let settings = root
         .get_mut("settings")
         .and_then(|v| v.as_table_mut())
         .ok_or("missing [settings] section")?;
-
-    println!("settings: {:?}", settings);
 
     match key {
         SetConfigVariables::OutputDirectory { value } => {
@@ -95,27 +97,16 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
             };
             settings.insert("log_format".into(), toml::Value::String(s.to_string()));
         }
-        SetConfigVariables::LogFilters => {
-            print!("Enter a record type to filter on: ");
-            io::stdout().flush()?;
-            let mut record_type = String::new();
-            io::stdin().read_line(&mut record_type)?;
-            let record_type = record_type.trim();
-
-            print!("Enter an action for the filter {{ allow | block }}: ");
-            io::stdout().flush()?;
-            let mut action = String::new();
-            io::stdin().read_line(&mut action)?;
-            let action = action.trim();
-
-            // Build new filter table
+        SetConfigVariables::LogFilters {
+            record_type,
+            action,
+        } => {
             let mut filter_table = toml::map::Map::new();
-            filter_table.insert("action".into(), toml::Value::String(action.to_string()));
-            filter_table.insert("record_type".into(), toml::Value::String(record_type.to_string()));
+            filter_table.insert("record_type".into(), toml::Value::String(record_type.clone()));
+            filter_table.insert("action".into(), toml::Value::String(action.clone()));
 
             if let Some(filters_value) = settings.get_mut("filters") {
                 if let Some(filters_array) = filters_value.as_array_mut() {
-                    // Find existing filter for this record_type
                     if let Some(existing) = filters_array.iter_mut().find(|v| {
                         v.as_table()
                             .and_then(|t| t.get("record_type"))
@@ -123,48 +114,81 @@ pub fn set_config(key: SetConfigVariables) -> Result<(), Box<dyn std::error::Err
                             .map(|s| s == record_type)
                             .unwrap_or(false)
                     }) {
-                        // Update existing
                         if let Some(table) = existing.as_table_mut() {
-                            table.insert(
-                                "action".into(),
-                                toml::Value::String(action.to_string()),
-                            );
-                            table.insert(
-                                "record_type".into(),
-                                toml::Value::String(record_type.to_string()),
-                            );
+                            table.insert("action".into(), toml::Value::String(action));
+                            table.insert("record_type".into(), toml::Value::String(record_type));
                         }
                     } else {
-                        // Insert new filter
                         filters_array.push(toml::Value::Table(filter_table));
                     }
                 } else {
-                    return Err("settings.filters is not an array".into()); 
+                    return Err("settings.filters is not an array".into());
                 }
             } else {
-                // Create new filters array
                 settings.insert(
                     "filters".into(),
                     toml::Value::Array(vec![toml::Value::Table(filter_table)]),
                 );
             }
         }
+        SetConfigVariables::RemoveFilter { record_type } => {
+            if let Some(filters_value) = settings.get_mut("filters") {
+                if let Some(filters_array) = filters_value.as_array_mut() {
+                    filters_array.retain(|v| {
+                        v.as_table()
+                            .and_then(|t| t.get("record_type"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s != record_type)
+                            .unwrap_or(true)
+                    });
+                }
+            }
+        }
     }
 
-    std::fs::write(file_path, toml::to_string_pretty(&root)?)?;
+    std::fs::write(CONFIG_FILE, toml::to_string_pretty(&root)?)?;
     Ok(())
 }
 
-pub fn get_config(key: Option<GetConfigVariables>) -> Result<(), anyhow::Error> {
-    let config = load_config().map_err(|e| anyhow::anyhow!("{}", e))?;
+/// Print config values (used by `config get`).
+pub fn get_config(key: Option<GetConfigVariables>) -> Result<(), Box<dyn std::error::Error>> {
+    let config = load_config()?;
     match key {
         Some(GetConfigVariables::OutputDirectory) => {
-            println!("OutputDirectory: {:?}", config.output_directory)
+            println!("output_directory: {}", config.output_directory);
         }
-        Some(GetConfigVariables::LogSize) => println!("LogSize: {:?}", config.log_size),
-        Some(GetConfigVariables::LogFormat) => println!("LogFormat: {:?}", config.log_format),
-        Some(GetConfigVariables::LogFilters) => println!("LogFilters: {:?}", config.filters),
+        Some(GetConfigVariables::LogSize) => println!("log_size: {}", config.log_size),
+        Some(GetConfigVariables::LogFormat) => println!("log_format: {}", config.log_format),
+        Some(GetConfigVariables::LogFilters) => println!("filters: {:?}", config.filters),
         None => println!("{:?}", config),
     }
     Ok(())
+}
+
+/// Add or update a single filter via interactive prompts 
+pub fn add_or_update_filter_interactive() -> Result<(), Box<dyn std::error::Error>> {
+    let record_type = inquire::Text::new("Enter a record type to filter on:")
+        .prompt()
+        .map_err(|e| e.to_string())?
+        .trim()
+        .to_string();
+    if record_type.is_empty() {
+        return Err("record type cannot be empty".into());
+    }
+
+    let filter_actions: Vec<&str> = vec!["Allow", "Block"];
+    let action = Select::new("Select an action for this record type", filter_actions)
+        .prompt()
+        .map_err(|e| e.to_string())?
+        .to_lowercase();
+
+    set_config(SetConfigVariables::LogFilters {
+        record_type,
+        action,
+    })
+}
+
+/// Remove a filter by record type
+pub fn remove_filter(record_type: String) -> Result<(), Box<dyn std::error::Error>> {
+    set_config(SetConfigVariables::RemoveFilter { record_type })
 }
