@@ -1,18 +1,12 @@
-use crate::config::{AuditConfig, CONFIG_FILE, GetConfigVariables, LOG_FORMATS, LogFormat, SetConfigVariables};
-use std::{fs::{OpenOptions}, io::{Write}};
-use std::path::Path;
+use crate::config::{
+    AuditConfig, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS, LogFormat,
+    SetConfigVariables,
+};
 use anyhow::{Result, anyhow};
 use config::Config;
 use inquire::Select;
-
-const DEFAULT_CONFIG: &str = r#"[meta]
-version = "0.3.0"
-
-[settings]
-log_format = "legacy"
-log_size = 65536
-output_directory = "/var/log/auditrs"
-"#;
+use std::path::Path;
+use std::{fs::OpenOptions, io::Write};
 
 impl std::str::FromStr for LogFormat {
     type Err = String;
@@ -68,20 +62,23 @@ impl AuditConfig {
             SetConfigVariables::LogSize { value } => {
                 settings.insert("log_size".into(), toml::Value::Integer(value as i64));
             }
-            SetConfigVariables::LogFormat { } => {
+            SetConfigVariables::LogFormat {} => {
                 let log_format = Select::new("Select a log format", LOG_FORMATS.to_vec())
-                .prompt()
-                .map_err(|e| anyhow!("{}", e))?
-                .to_lowercase();
-            
-                settings.insert("log_format".into(), toml::Value::String(log_format.to_string().to_lowercase()));
+                    .prompt()
+                    .map_err(|e| anyhow!("{}", e))?
+                    .to_lowercase();
+
+                settings.insert(
+                    "log_format".into(),
+                    toml::Value::String(log_format.to_string().to_lowercase()),
+                );
             }
         }
         let write_result = std::fs::write(CONFIG_FILE, toml::to_string_pretty(&root)?);
         if write_result.is_err() {
             return Err(anyhow!("Failed to save config to {}", CONFIG_FILE));
         } else {
-        println!("Config successfully saved to {}", CONFIG_FILE);
+            println!("Config successfully saved to {}", CONFIG_FILE);
         }
         Ok(())
     }

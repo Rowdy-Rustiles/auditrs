@@ -213,10 +213,7 @@ fn build_config() -> ClapCommand {
                                 .help("New log size limit"),
                         ),
                 )
-                .subcommand(
-                    ClapCommand::new("format")
-                        .about("Set the output format")
-                )
+                .subcommand(ClapCommand::new("format").about("Set the output format"))
                 .arg_required_else_help(true),
         )
         .arg_required_else_help(true)

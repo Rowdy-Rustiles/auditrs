@@ -1,17 +1,16 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
-use crate::config::{ACTIONS, AuditFilter, FILTER_FILE_EXTENSIONS, Filters, FILTERS_FILE, State};
+use crate::config::{ACTIONS, AuditFilter, FILTER_FILE_EXTENSIONS, FILTERS_FILE, Filters, State};
 use crate::parser::audit_types::RecordType;
-use anyhow::{anyhow, Context, Result};
-use std::fs::OpenOptions;
-use std::str::FromStr;
+use crate::utils::current_utc_string;
+use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
+use std::fs::OpenOptions;
 use std::io::{BufRead, Write};
 use std::path::Path;
+use std::str::FromStr;
 use strum::IntoEnumIterator;
-use crate::utils::current_utc_string;
 use toml;
-
 
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for autocomplete).
@@ -48,7 +47,10 @@ impl Filters {
                     .filter_map(|table| {
                         let record_type = table.get("record_type")?.as_str()?.to_string();
                         let action = table.get("action")?.as_str()?.to_string();
-                        Some(AuditFilter { record_type, action })
+                        Some(AuditFilter {
+                            record_type,
+                            action,
+                        })
                     })
                     .collect()
             })
@@ -70,7 +72,10 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
         .iter()
         .map(|f| {
             let mut table = toml::map::Map::new();
-            table.insert("record_type".into(), toml::Value::String(f.record_type.clone()));
+            table.insert(
+                "record_type".into(),
+                toml::Value::String(f.record_type.clone()),
+            );
             table.insert("action".into(), toml::Value::String(f.action.clone()));
             toml::Value::Table(table)
         })
@@ -79,7 +84,10 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
     let mut root = toml::map::Map::new();
     root.insert("filters".into(), toml::Value::Array(array));
 
-    std::fs::write(file_path, toml::to_string_pretty(&toml::Value::Table(root))?)?;
+    std::fs::write(
+        file_path,
+        toml::to_string_pretty(&toml::Value::Table(root))?,
+    )?;
     Ok(())
 }
 
@@ -154,7 +162,10 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
         .map_err(|e| anyhow!("{}", e))?
         .to_lowercase();
 
-    let filter = AuditFilter { record_type, action };
+    let filter = AuditFilter {
+        record_type,
+        action,
+    };
     set_filter(filter)
 }
 
@@ -224,7 +235,10 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         .map_err(|e| anyhow!("{}", e))?
         .to_lowercase();
 
-    let filter = AuditFilter { record_type, action };
+    let filter = AuditFilter {
+        record_type,
+        action,
+    };
     set_filter(filter)
 }
 
@@ -306,10 +320,12 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     let filters_array = root
         .get("filters")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!(
-            "'{}': missing [[filters]] array at top level",
-            path.display()
-        ))?;
+        .ok_or_else(|| {
+            anyhow!(
+                "'{}': missing [[filters]] array at top level",
+                path.display()
+            )
+        })?;
 
     let mut filters = Vec::new();
 
@@ -326,7 +342,10 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         let record_type = match table.get("record_type").and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
-                eprintln!("warning: {}: missing or non-string 'record_type' field, skipping", location);
+                eprintln!(
+                    "warning: {}: missing or non-string 'record_type' field, skipping",
+                    location
+                );
                 continue;
             }
         };
@@ -334,7 +353,10 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         let action = match table.get("action").and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
-                eprintln!("warning: {}: missing or non-string 'action' field, skipping", location);
+                eprintln!(
+                    "warning: {}: missing or non-string 'action' field, skipping",
+                    location
+                );
                 continue;
             }
         };
@@ -366,7 +388,10 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
         let (record_type, action) = match trimmed.split_once(':') {
             Some(pair) => pair,
             None => {
-                eprintln!("warning: {}: invalid syntax '{}' (expected 'record_type: action'), skipping", location, trimmed);
+                eprintln!(
+                    "warning: {}: invalid syntax '{}' (expected 'record_type: action'), skipping",
+                    location, trimmed
+                );
                 continue;
             }
         };
@@ -413,7 +438,11 @@ pub fn import_filters(file: &str) -> Result<()> {
         set_filter(filter)?;
     }
 
-    println!("Successfully imported {} filter(s) from '{}'", count, path.display());
+    println!(
+        "Successfully imported {} filter(s) from '{}'",
+        count,
+        path.display()
+    );
     Ok(())
 }
 
@@ -423,10 +452,13 @@ pub fn dump_filters(file: &str, state: &State) -> Result<()> {
         return Err(anyhow!("No filters defined; nothing to dump."));
     }
 
-    let filter_file_extension = Select::new("Select a filter file format", FILTER_FILE_EXTENSIONS.to_vec())
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?
-        .to_lowercase();
+    let filter_file_extension = Select::new(
+        "Select a filter file format",
+        FILTER_FILE_EXTENSIONS.to_vec(),
+    )
+    .prompt()
+    .map_err(|e| anyhow!("{}", e))?
+    .to_lowercase();
 
     // Replace any user-given extension with the selected extension from the terminal
     let base = Path::new(file).with_extension("");
@@ -439,7 +471,9 @@ pub fn dump_filters(file: &str, state: &State) -> Result<()> {
         }
     }
 
-    let mut header = String::from("/*\n\nGenerated by auditrs via CLI at ") + &current_utc_string() + "\n\n*/\n\n";
+    let mut header = String::from("/*\n\nGenerated by auditrs via CLI at ")
+        + &current_utc_string()
+        + "\n\n*/\n\n";
     let content = match filter_file_extension.as_str() {
         "toml" => to_toml_format(filters)?,
         "ars" => to_ars_format(filters)?,
@@ -454,12 +488,23 @@ pub fn dump_filters(file: &str, state: &State) -> Result<()> {
 
 fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
     let mut table = toml::map::Map::new();
-    table.insert("filters".into(), toml::Value::Array(filters.iter().map(|f| {
-        let mut filter_table = toml::map::Map::new();
-        filter_table.insert("record_type".into(), toml::Value::String(f.record_type.clone()));
-        filter_table.insert("action".into(), toml::Value::String(f.action.clone()));
-        toml::Value::Table(filter_table)
-    }).collect()));
+    table.insert(
+        "filters".into(),
+        toml::Value::Array(
+            filters
+                .iter()
+                .map(|f| {
+                    let mut filter_table = toml::map::Map::new();
+                    filter_table.insert(
+                        "record_type".into(),
+                        toml::Value::String(f.record_type.clone()),
+                    );
+                    filter_table.insert("action".into(), toml::Value::String(f.action.clone()));
+                    toml::Value::Table(filter_table)
+                })
+                .collect(),
+        ),
+    );
     Ok(toml::to_string_pretty(&toml::Value::Table(table))?)
 }
 
