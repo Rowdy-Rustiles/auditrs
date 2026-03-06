@@ -192,7 +192,7 @@ fn build_config() -> ClapCommand {
         )
         .subcommand(
             ClapCommand::new("set")
-                .about("Update config values")
+                .about("Update config values, will reboot the daemon if the config was changed")
                 .subcommand(
                     ClapCommand::new("directory")
                         .about("Set the log directory")
@@ -206,12 +206,6 @@ fn build_config() -> ClapCommand {
                 .subcommand(
                     ClapCommand::new("size")
                         .about("Set the log size limit")
-                        .arg(
-                            Arg::new("value")
-                                .value_name("VALUE")
-                                .required(true)
-                                .help("New log size limit"),
-                        ),
                 )
                 .subcommand(ClapCommand::new("format").about("Set the output format"))
                 .arg_required_else_help(true),

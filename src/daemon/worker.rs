@@ -5,7 +5,6 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use crate::config::load_config;
 use crate::correlator::{AuditEvent, Correlator};
 use crate::daemon::daemon;
 use crate::netlink::{NetlinkAuditTransport, RawAuditRecord};
@@ -13,7 +12,6 @@ use crate::parser::ParsedAuditRecord;
 use crate::writer::AuditLogWriter;
 
 pub async fn run_worker() -> Result<()> {
-    let config = load_config().unwrap();
     let writer = AuditLogWriter::new()?;
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();

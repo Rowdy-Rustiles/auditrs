@@ -18,12 +18,16 @@ impl AuditLogWriter {
             .create(true)
             .append(true)
             .open(&log_file)?;
-        Ok(Self {
+        let mut writer = Self {
             output_format: state.config.log_format.try_into()?,
             destination: log_dir,
             log_size: state.config.log_size,
             file_handle,
-        })
+        };
+        // Immediately check if the log file is too large and create a new one if it is
+        // This is needed in the case of a reboot caused by a config log size change
+        writer.check_log_size()?;
+        Ok(writer)
     }
 
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
@@ -71,6 +75,21 @@ impl AuditLogWriter {
 
         let res = format!("");
         writeln!(self.file_handle,);
+        Ok(())
+    }
+
+    /// Check log size for log rotation, needs to be rewritten with proper log rotation logic
+    fn check_log_size(&mut self) -> Result<()> {
+        let file_size = self.file_handle.metadata()?.len();
+        if file_size > self.log_size as u64 {
+            let active_log = self.destination.join("auditrs.log");
+            let archived_log = self.destination.join(format!("auditrs_{}.log", current_utc_string()));
+            std::fs::rename(&active_log, &archived_log)?;
+            self.file_handle = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&active_log)?;
+        }
         Ok(())
     }
 }

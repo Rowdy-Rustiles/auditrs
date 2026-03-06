@@ -6,7 +6,7 @@ use crate::config::{
     get_config, get_filters, import_filters, remove_filter_interactive, set_config,
     update_filter_interactive,
 };
-use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
+use crate::daemon::control::{reboot_auditrs, start_auditrs, status_auditrs, stop_auditrs};
 
 /// Top-level entry point for handling CLI subcommands
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
@@ -30,33 +30,7 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn start_auditrs() -> Result<()> {
-    start_daemon()
-}
-
-fn stop_auditrs() -> Result<()> {
-    stop_daemon()?;
-    println!("Stopped auditRS daemon");
-    Ok(())
-}
-
-fn reboot_auditrs() -> Result<()> {
-    println!("Rebooting auditRS");
-    let _ = stop_auditrs();
-    start_auditrs()
-}
-
-fn status_auditrs() -> Result<()> {
-    println!(
-        "auditRS is {}",
-        if is_running() {
-            "running"
-        } else {
-            "not running"
-        }
-    );
-    Ok(())
-}
+/// Tools subcommands, to be moved to /tools when written
 
 fn handle_dump(_matches: &ArgMatches) -> Result<()> {
     println!("Dump, WIP");
@@ -90,7 +64,7 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
 }
 
 fn handle_config_set(matches: &ArgMatches) -> Result<()> {
-    match matches.subcommand() {
+    let result = match matches.subcommand() {
         Some(("directory", m)) => {
             let value = m
                 .get_one::<String>("value")
@@ -100,18 +74,20 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("size", m)) => {
-            let value = m
-                .get_one::<String>("value")
-                .context("missing value")?
-                .parse()
-                .context("size must be a number")?;
-            set_config(SetConfigVariables::LogSize { value }).map_err(|e| anyhow::anyhow!("{}", e))
+            set_config(SetConfigVariables::LogSize).map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("format", m)) => {
             set_config(SetConfigVariables::LogFormat).map_err(|e| anyhow::anyhow!("{}", e))
         }
         _ => Ok(()),
+    };
+
+    // Reboot the daemon if the config was changed
+    if result.is_ok() {
+        reboot_auditrs()?;
     }
+
+    result
 }
 
 fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {

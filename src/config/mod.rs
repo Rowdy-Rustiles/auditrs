@@ -58,7 +58,7 @@ pub enum GetConfigVariables {
 #[derive(Debug, Deserialize)]
 pub enum SetConfigVariables {
     OutputDirectory { value: String },
-    LogSize { value: usize },
+    LogSize,
     LogFormat,
 }
 

@@ -34,7 +34,6 @@ fn prepare_auditrs() -> Result<()> {
         .arg("auditd")
         .arg("stop")
         .output()?;
-    println!("Environment successfully prepared");
     Ok(())
 }
 
@@ -42,7 +41,6 @@ fn prepare_auditrs() -> Result<()> {
 /// Both the parent (main) and child (daemon) will return up the call stack with a result.
 /// The parent process will wait a moment and check if the daemon's PID file exists.
 pub fn start_daemon() -> Result<(), anyhow::Error> {
-    println!("Starting auditrs...");
     is_root()?;
     prepare_auditrs()?;
     let pid = pid_file_path();
@@ -65,7 +63,6 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
             std::thread::sleep(std::time::Duration::from_millis(100));
 
             if pid.exists() {
-                println!("Auditrs started successfully");
                 Ok(())
             } else {
                 Err(anyhow::anyhow!(format!(

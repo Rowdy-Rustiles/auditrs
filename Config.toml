@@ -1,0 +1,13 @@
+/*
+
+An example Config.toml file for auditrs. In production, these are stored at /etc/auditrs/config.toml
+
+*/
+
+[meta]
+version = "0.3.0"
+
+[settings]
+log_format = "simple"
+log_size = 20
+output_directory = "/var/log/auditrs"
