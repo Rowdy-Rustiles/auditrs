@@ -1,11 +1,13 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
-use crate::config::{ACTIONS, AuditFilter, FILTER_FILE_EXTENSIONS, FILTERS_FILE, Filters, State};
+use crate::config::{
+    ACTIONS, AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, FILTERS_FILE, Filters, State,
+};
 use crate::parser::audit_types::RecordType;
 use crate::utils::current_utc_string;
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::{BufRead, Write};
 use std::path::Path;
 use std::str::FromStr;
@@ -67,6 +69,7 @@ pub fn load_filters() -> Result<Filters> {
 
 fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
     let file_path = FILTERS_FILE;
+    fs::create_dir_all(CONFIG_DIR)?;
 
     let array: Vec<toml::Value> = filters
         .iter()
@@ -370,6 +373,7 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     Ok(filters)
 }
 
+/// Import filters from an external and load them into filters.toml (used in `auditrs import <file>` command)
 fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     let cleaned = strip_block_comments(content);
     let reader = std::io::BufReader::new(cleaned.as_bytes());
@@ -381,7 +385,7 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
 
         if trimmed.is_empty() {
             continue;
-        }
+        } 
 
         let location = format!("{}:{}", path.display(), line_num + 1);
 

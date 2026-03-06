@@ -8,10 +8,8 @@ mod writer;
 
 use std::fs::File;
 use std::path::PathBuf;
-// Will be moved to a centralized config
 
-const DEFAULT_DIR: &str = "/home/ec2-user/auditrs/var/log/auditrs/";
-// const DEFAULT_DIR: &str = "/var/log/auditrs/";
+const DEFAULT_DIR: &str = "/var/log/auditrs/";
 const DEFAULT_OUTPUT_FORMAT: OutputFormat = OutputFormat::Simple;
 const DEFAULT_LOG_SIZE: usize = 6 * 1024 * 1024; // 6 MB
 
