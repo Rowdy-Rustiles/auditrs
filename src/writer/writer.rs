@@ -1,4 +1,5 @@
 use super::{AuditLogWriter, DEFAULT_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT, OutputFormat};
+use crate::config::State;
 use crate::correlator::AuditEvent;
 use crate::utils::*;
 use anyhow::Result;
@@ -9,7 +10,8 @@ use std::time::UNIX_EPOCH;
 
 impl AuditLogWriter {
     pub fn new() -> anyhow::Result<Self> {
-        let log_dir = PathBuf::from(DEFAULT_DIR);
+        let state  = State::load_state()?;
+        let log_dir = PathBuf::from(state.config.output_directory);
         create_dir_all(&log_dir)?;
         let log_file = log_dir.join("auditrs.log");
         let file_handle = OpenOptions::new()
@@ -17,9 +19,9 @@ impl AuditLogWriter {
             .append(true)
             .open(&log_file)?;
         Ok(Self {
-            output_format: DEFAULT_OUTPUT_FORMAT,
+            output_format: state.config.log_format.try_into()?,
             destination: log_dir,
-            log_size: DEFAULT_LOG_SIZE,
+            log_size: state.config.log_size,
             file_handle,
         })
     }
@@ -70,5 +72,17 @@ impl AuditLogWriter {
         let res = format!("");
         writeln!(self.file_handle,);
         Ok(())
+    }
+}
+
+impl TryFrom<String> for OutputFormat {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "legacy" => Ok(OutputFormat::Legacy),
+            "simple" => Ok(OutputFormat::Simple),
+            "json" => Ok(OutputFormat::Json),
+            _ => Err(anyhow::anyhow!("Invalid output format: {}", value)),
+        }
     }
 }

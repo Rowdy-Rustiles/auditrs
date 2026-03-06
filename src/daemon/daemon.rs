@@ -5,15 +5,46 @@ use anyhow::{Context, Result};
 /// working with systemctl or similar system services
 use std::fs::{self, File};
 use std::path::PathBuf;
-use std::process::exit;
+use std::process::{exit, Command};
 
 use crate::daemon::PID_FILE_NAME;
 
 use daemonize::{Daemonize, Outcome};
+
+/// Checks if the user has is running with root privileges.
+/// Users without permissions will write to relative paths, we want to avoid this.
+/// TODO: Ideally we check if the user has write access to the audit log directory.
+fn is_root() -> Result<()> {
+    unsafe {
+        if libc::geteuid() == 0 {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("User is not running with root privileges"))
+        }
+    }
+}
+
+fn prepare_auditrs() -> Result<()> {
+    Command::new("auditctl")
+        .arg("-e")
+        .arg("1")
+        .output()?;
+
+    Command::new("service")
+        .arg("auditd")
+        .arg("stop")
+        .output()?;
+    println!("Environment successfully prepared");
+    Ok(())
+}
+
 /// Creates a daemon process that runs in the background.
 /// Both the parent (main) and child (daemon) will return up the call stack with a result.
 /// The parent process will wait a moment and check if the daemon's PID file exists.
 pub fn start_daemon() -> Result<(), anyhow::Error> {
+    println!("Starting auditrs...");
+    is_root()?;
+    prepare_auditrs()?;
     let pid = pid_file_path();
     if let Some(parent) = pid.parent() {
         fs::create_dir_all(parent)?;
@@ -34,6 +65,7 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
             std::thread::sleep(std::time::Duration::from_millis(100));
 
             if pid.exists() {
+                println!("Auditrs started successfully");
                 Ok(())
             } else {
                 Err(anyhow::anyhow!(format!(
@@ -46,13 +78,13 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
         Outcome::Child(res) => {
             // We're in the child process - we are daemon!
             // First, acquire the guard on the daemon's PID file so it gets deleted.
-            let _guard = FileGuard::new(pid);
+            let _guard = FileGuard::new(pid)?;
 
-            // Now see if we were actually created successfully.
             match res {
                 Ok(_) => {
                     let rt = tokio::runtime::Runtime::new()?;
-                    rt.block_on(run_worker())
+                    rt.block_on(run_worker())?;
+                    Ok(())
                 }
                 Err(e) => Err(anyhow::anyhow!("Failed to daemonize: {}", e)),
             }
@@ -62,6 +94,7 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
 
 /// Send SIGTERM to the daemon (used by `auditrs stop`).
 pub fn stop_daemon() -> Result<()> {
+    is_root()?;
     let path = pid_file_path();
     let contents = fs::read_to_string(&path).context("No PID file found. Is AuditRS running?")?;
     let pid: i32 = contents
@@ -113,7 +146,7 @@ struct FileGuard {
 
 impl FileGuard {
     fn new(path: PathBuf) -> Result<Self, std::io::Error> {
-        let file = std::fs::File::create(&path)?;
+        let file = std::fs::File::open(&path)?;
         Ok(Self { file, path })
     }
 }

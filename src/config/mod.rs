@@ -10,8 +10,9 @@ pub use filters::{
 };
 use serde::Deserialize;
 
-pub const CONFIG_FILE: &str = "Config.toml";
-pub const FILTERS_FILE: &str = "Filters.toml";
+pub const CONFIG_DIR: &str = "/etc/auditrs";
+pub const CONFIG_FILE: &str = "/etc/auditrs/config.toml";
+pub const FILTERS_FILE: &str = "/etc/auditrs/filters.toml";
 pub const FILTER_FILE_EXTENSIONS: &[&str] = &["toml", "ars"];
 pub const ACTIONS: &[&str] = &["allow", "block"];
 pub const LOG_FORMATS: &[&str] = &["Legacy", "Simple", "Json"];

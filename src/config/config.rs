@@ -1,12 +1,12 @@
 use crate::config::{
-    AuditConfig, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS, LogFormat,
-    SetConfigVariables,
+    AuditConfig, CONFIG_DIR, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS,
+    LogFormat, SetConfigVariables,
 };
 use anyhow::{Result, anyhow};
 use config::Config;
 use inquire::Select;
 use std::path::Path;
-use std::{fs::OpenOptions, io::Write};
+use std::{fs, fs::OpenOptions, io::Write};
 
 impl std::str::FromStr for LogFormat {
     type Err = String;
@@ -26,7 +26,8 @@ impl std::str::FromStr for LogFormat {
 impl AuditConfig {
     pub fn load_config() -> Result<AuditConfig> {
         if !Path::new(CONFIG_FILE).exists() {
-            eprintln!("Config file not found, creating default file");
+            eprintln!("Config file not found at {CONFIG_FILE}, creating default");
+            fs::create_dir_all(CONFIG_DIR)?;
             let mut config_file = OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -35,7 +36,10 @@ impl AuditConfig {
         }
 
         let config = Config::builder()
-            .add_source(config::File::new("Config", config::FileFormat::Toml))
+            .add_source(config::File::new(
+                CONFIG_FILE.trim_end_matches(".toml"),
+                config::FileFormat::Toml,
+            ))
             .build()
             .map_err(|e| anyhow!("{}", e))?;
 
