@@ -24,6 +24,7 @@ toml = "0.8"
 serde = { version = "1.0.228", features = ["derive"] }
 inquire = "0.9.4"
 fuzzy-matcher = "0.3.7"
+colorized = "1.0.0"
     
 [target.'cfg(unix)'.dependencies]
 daemonize = "0.5.0"

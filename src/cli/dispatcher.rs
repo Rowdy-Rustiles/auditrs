@@ -12,8 +12,8 @@ use crate::daemon::control::{reboot_auditrs, start_auditrs, status_auditrs, stop
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     let state = State::load_state()?;
     match matches.subcommand() {
-        Some(("start", _)) => start_auditrs()?,
-        Some(("stop", _)) => stop_auditrs()?,
+        Some(("start", _)) => start_auditrs(false)?,
+        Some(("stop", _)) => stop_auditrs(false)?,
         Some(("reboot", _)) => reboot_auditrs()?,
         Some(("status", _)) => status_auditrs()?,
         Some(("dump", sub_m)) => handle_dump(sub_m)?,
