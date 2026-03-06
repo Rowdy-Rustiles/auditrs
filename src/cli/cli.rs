@@ -188,7 +188,8 @@ fn build_config() -> ClapCommand {
                 .about("Read config values")
                 .subcommand(ClapCommand::new("directory").about("Get the current log directory"))
                 .subcommand(ClapCommand::new("size").about("Get the current log size limit"))
-                .subcommand(ClapCommand::new("format").about("Get the current output format")),
+                .subcommand(ClapCommand::new("format").about("Get the current output format"))
+                .subcommand(ClapCommand::new("journal-size").about("Get the current journal size limit")),
         )
         .subcommand(
             ClapCommand::new("set")
@@ -208,6 +209,10 @@ fn build_config() -> ClapCommand {
                         .about("Set the log size limit")
                 )
                 .subcommand(ClapCommand::new("format").about("Set the output format"))
+                .subcommand(
+                    ClapCommand::new("journal-size")
+                        .about("Set the journal size limit")
+                )
                 .arg_required_else_help(true),
         )
         .arg_required_else_help(true)

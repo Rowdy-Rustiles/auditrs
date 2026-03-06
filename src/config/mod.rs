@@ -10,6 +10,8 @@ pub use filters::{
 };
 use serde::Deserialize;
 
+pub const MINIMUM_LOG_SIZE: usize = 8096; // 8 KB
+pub const MINIMUM_JOURNAL_SIZE: usize = 8388608; // 8 MB
 pub const CONFIG_DIR: &str = "/etc/auditrs";
 pub const CONFIG_FILE: &str = "/etc/auditrs/config.toml";
 pub const FILTERS_FILE: &str = "/etc/auditrs/filters.toml";
@@ -23,6 +25,7 @@ version = "0.3.0"
 log_format = "legacy"
 log_size = 65536
 output_directory = "/var/log/auditrs"
+journal_size = 8388608
 "#;
 
 #[derive(Debug)]
@@ -46,6 +49,7 @@ pub struct AuditConfig {
     pub output_directory: String,
     pub log_size: usize,
     pub log_format: String,
+    pub journal_size: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,6 +57,7 @@ pub enum GetConfigVariables {
     OutputDirectory,
     LogSize,
     LogFormat,
+    JournalSize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +65,7 @@ pub enum SetConfigVariables {
     OutputDirectory { value: String },
     LogSize,
     LogFormat,
+    JournalSize,
 }
 
 // Unused, for reference

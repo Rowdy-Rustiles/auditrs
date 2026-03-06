@@ -1,4 +1,5 @@
-use super::{AuditLogWriter, DEFAULT_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT, OutputFormat};
+use super::{AuditLogWriter, DEFAULT_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT};
+use crate::config::LogFormat;
 use crate::config::State;
 use crate::correlator::AuditEvent;
 use crate::utils::*;
@@ -19,7 +20,7 @@ impl AuditLogWriter {
             .append(true)
             .open(&log_file)?;
         let mut writer = Self {
-            output_format: state.config.log_format.try_into()?,
+            output_format: state.config.log_format.parse::<LogFormat>().map_err(|e| anyhow::anyhow!("{}", e))?,
             destination: log_dir,
             log_size: state.config.log_size,
             file_handle,
@@ -32,9 +33,9 @@ impl AuditLogWriter {
 
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
         match self.output_format {
-            OutputFormat::Legacy => self.write_event_legacy(event),
-            OutputFormat::Simple => self.write_event_simple(event),
-            OutputFormat::Json => self.write_event_json(event),
+            LogFormat::Legacy => self.write_event_legacy(event),
+            LogFormat::Simple => self.write_event_simple(event),
+            LogFormat::Json => self.write_event_json(event),
         }
     }
 
@@ -91,17 +92,5 @@ impl AuditLogWriter {
                 .open(&active_log)?;
         }
         Ok(())
-    }
-}
-
-impl TryFrom<String> for OutputFormat {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "legacy" => Ok(OutputFormat::Legacy),
-            "simple" => Ok(OutputFormat::Simple),
-            "json" => Ok(OutputFormat::Json),
-            _ => Err(anyhow::anyhow!("Invalid output format: {}", value)),
-        }
     }
 }

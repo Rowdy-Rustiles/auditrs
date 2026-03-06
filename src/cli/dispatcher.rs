@@ -54,6 +54,7 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
                 Some("directory") => Some(GetConfigVariables::OutputDirectory),
                 Some("size") => Some(GetConfigVariables::LogSize),
                 Some("format") => Some(GetConfigVariables::LogFormat),
+                Some("journal-size") => Some(GetConfigVariables::JournalSize),
                 _ => None,
             };
             get_config(key).map_err(|e| anyhow::anyhow!("{}", e))
@@ -78,6 +79,9 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
         }
         Some(("format", m)) => {
             set_config(SetConfigVariables::LogFormat).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("journal-size", m)) => {
+            set_config(SetConfigVariables::JournalSize).map_err(|e| anyhow::anyhow!("{}", e))
         }
         _ => Ok(()),
     };

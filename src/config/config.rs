@@ -1,10 +1,10 @@
 use crate::config::{
     AuditConfig, CONFIG_DIR, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS,
-    LogFormat, SetConfigVariables,
+    LogFormat, MINIMUM_JOURNAL_SIZE, MINIMUM_LOG_SIZE, SetConfigVariables,
 };
 use anyhow::{Result, anyhow};
 use config::Config;
-use inquire::{Select, Text};
+use inquire::{Select, Text, validator::Validation};
 use crate::utils::capitalize_first_letter;
 use std::path::Path;
 use std::{fs, fs::OpenOptions, io::Write};
@@ -74,11 +74,39 @@ impl AuditConfig {
                 let current_size = config.log_size;
                 let log_size = Text::new("Enter a new log size (in bytes):")
                     .with_help_message(&format!("Current log size: {} bytes", current_size))
+                    .with_validator(|input: &str| { // Enforce minimum log size (8 KB)
+                        match input.parse::<usize>() {
+                            Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
+                            Ok(size) if size < MINIMUM_LOG_SIZE => {
+                                Ok(Validation::Invalid(format!("Log size must be at least {} bytes", MINIMUM_LOG_SIZE).into()))
+                            }
+                            Ok(_) => Ok(Validation::Valid),
+                        }
+                    })
                     .prompt()
                     .map_err(|e| anyhow!("{}", e))?
                     .parse::<usize>()
                     .map_err(|e| anyhow!("{}", e))?;
                 settings.insert("log_size".into(), toml::Value::Integer(log_size as i64));
+            }
+            SetConfigVariables::JournalSize => {
+                let current_size = config.journal_size;
+                let journal_size = Text::new("Enter a new journal size (in bytes):")
+                    .with_help_message(&format!("Current journal size: {} bytes", current_size))
+                    .with_validator(|input: &str| {
+                        match input.parse::<usize>() {
+                            Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
+                            Ok(size) if size < MINIMUM_JOURNAL_SIZE => {
+                                Ok(Validation::Invalid(format!("Journal size must be at least {} bytes", MINIMUM_JOURNAL_SIZE).into()))
+                            }
+                            Ok(_) => Ok(Validation::Valid),
+                        }
+                    })
+                    .prompt()
+                    .map_err(|e| anyhow!("{}", e))?
+                    .parse::<usize>()
+                    .map_err(|e| anyhow!("{}", e))?;
+                settings.insert("journal_size".into(), toml::Value::Integer(journal_size as i64));
             }
             SetConfigVariables::LogFormat {} => {
                 let current_fmt = capitalize_first_letter(&config.log_format);
@@ -112,6 +140,7 @@ impl AuditConfig {
             }
             Some(GetConfigVariables::LogSize) => println!("{} bytes", config.log_size),
             Some(GetConfigVariables::LogFormat) => println!("{}", capitalize_first_letter(&config.log_format)),
+            Some(GetConfigVariables::JournalSize) => println!("{} bytes", config.journal_size),
             None => println!("{:?}", config),
         }
         Ok(())
