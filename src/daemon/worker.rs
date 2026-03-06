@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::time::Duration;
 use tokio::signal;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 

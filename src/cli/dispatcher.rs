@@ -2,8 +2,9 @@ use anyhow::{Context, Result};
 use clap::ArgMatches;
 
 use crate::config::{
-    add_filter_interactive, dump_filters, get_config, get_filters, import_filters, remove_filter_interactive,
-    set_config, update_filter_interactive, GetConfigVariables, LogFormat, SetConfigVariables, State,
+    GetConfigVariables, LogFormat, SetConfigVariables, State, add_filter_interactive, dump_filters,
+    get_config, get_filters, import_filters, remove_filter_interactive, set_config,
+    update_filter_interactive,
 };
 use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
 
@@ -107,8 +108,7 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
             set_config(SetConfigVariables::LogSize { value }).map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("format", m)) => {
-            set_config(SetConfigVariables::LogFormat)
-                .map_err(|e| anyhow::anyhow!("{}", e))
+            set_config(SetConfigVariables::LogFormat).map_err(|e| anyhow::anyhow!("{}", e))
         }
         _ => Ok(()),
     }
