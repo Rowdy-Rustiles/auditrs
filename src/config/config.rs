@@ -21,9 +21,7 @@ impl std::str::FromStr for LogFormat {
     }
 }
 
-/// TODO: initialize default config file if one doesn't exist
-/// also, store the config in memory, should be small enough to not cause performance concerns,
-/// therefore, we can avoid the IO costs of reading the config file on every operation
+
 impl AuditConfig {
     pub fn load_config() -> Result<AuditConfig> {
         if !Path::new(CONFIG_FILE).exists() {
@@ -109,7 +107,7 @@ impl AuditConfig {
                 settings.insert("journal_size".into(), toml::Value::Integer(journal_size as i64));
             }
             SetConfigVariables::LogFormat {} => {
-                let current_fmt = capitalize_first_letter(&config.log_format);
+                let current_fmt = capitalize_first_letter(&config.log_format.to_string());
                 let log_format = Select::new("Select a log format", LOG_FORMATS.to_vec())
                     .with_help_message(&format!("Current log format: {}]\n[{}", current_fmt, Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()))
                     .prompt()
@@ -139,7 +137,7 @@ impl AuditConfig {
                 println!("{}", config.output_directory);
             }
             Some(GetConfigVariables::LogSize) => println!("{} bytes", config.log_size),
-            Some(GetConfigVariables::LogFormat) => println!("{}", capitalize_first_letter(&config.log_format)),
+            Some(GetConfigVariables::LogFormat) => println!("{}", capitalize_first_letter(&config.log_format.to_string())),
             Some(GetConfigVariables::JournalSize) => println!("{} bytes", config.journal_size),
             None => println!("{:?}", config),
         }
@@ -158,4 +156,24 @@ pub fn set_config(key: SetConfigVariables) -> Result<()> {
 
 pub fn get_config(key: Option<GetConfigVariables>) -> Result<()> {
     AuditConfig::get_config(key)
+}
+
+impl LogFormat {
+    pub fn to_string(&self) -> String {
+        match self {
+            LogFormat::Legacy => "legacy".to_string(),
+            LogFormat::Simple => "simple".to_string(),
+            LogFormat::Json => "json".to_string(),
+        }
+    }
+
+    /// Get the extension for the log file based on the log format
+    /// Each log format has a unique extension for easier identification and parsing.
+    pub fn get_extension(&self) -> String {
+        match self {
+            LogFormat::Legacy => "log".to_string(),
+            LogFormat::Simple => "slog".to_string(), // i like this
+            LogFormat::Json => "json".to_string(),
+        }
+    }
 }

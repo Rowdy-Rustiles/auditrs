@@ -8,19 +8,20 @@ use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
+use std::os::unix::fs::DirEntryExt;
 
 impl AuditLogWriter {
     pub fn new() -> anyhow::Result<Self> {
         let state  = State::load_state()?;
         let log_dir = PathBuf::from(state.config.output_directory);
         create_dir_all(&log_dir)?;
-        let log_file = log_dir.join("auditrs.log");
+        let log_file = log_dir.join(format!("auditrs.{}", state.config.log_format.get_extension()));
         let file_handle = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&log_file)?;
         let mut writer = Self {
-            output_format: state.config.log_format.parse::<LogFormat>().map_err(|e| anyhow::anyhow!("{}", e))?,
+            output_format: state.config.log_format,
             destination: log_dir,
             log_size: state.config.log_size,
             file_handle,
@@ -33,10 +34,11 @@ impl AuditLogWriter {
 
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
         match self.output_format {
-            LogFormat::Legacy => self.write_event_legacy(event),
-            LogFormat::Simple => self.write_event_simple(event),
-            LogFormat::Json => self.write_event_json(event),
+            LogFormat::Legacy => self.write_event_legacy(event)?,
+            LogFormat::Simple => self.write_event_simple(event)?,
+            LogFormat::Json => self.write_event_json(event)?,
         }
+        self.check_log_size()
     }
 
     fn write_event_legacy(&mut self, event: AuditEvent) -> Result<()> {
@@ -79,12 +81,28 @@ impl AuditLogWriter {
         Ok(())
     }
 
+    fn active_log_path(&self) -> PathBuf {
+        self.destination.join(format!("auditrs.{}", self.output_format.get_extension()))
+    }
+    
     /// Check log size for log rotation, needs to be rewritten with proper log rotation logic
+    /// Overly complicated, needs to be rewritten and split
     fn check_log_size(&mut self) -> Result<()> {
-        let file_size = self.file_handle.metadata()?.len();
+        let active_log = self.active_log_path();
+        let file_size = match std::fs::metadata(&active_log) {
+            Ok(meta) => meta.len(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e.into()),
+        };
         if file_size > self.log_size as u64 {
-            let active_log = self.destination.join("auditrs.log");
-            let archived_log = self.destination.join(format!("auditrs_{}.log", current_utc_string()));
+            let ext = &self.output_format.get_extension();
+            let archive_counter = std::fs::read_dir(&self.destination)?
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry.path().extension().and_then(|e| e.to_str()) == Some(ext)
+                })
+                .count();
+            let archived_log = self.destination.join(format!("auditrs_{}_{}.{}", archive_counter, current_utc_string(), self.output_format.get_extension()));
             std::fs::rename(&active_log, &archived_log)?;
             self.file_handle = OpenOptions::new()
                 .create(true)

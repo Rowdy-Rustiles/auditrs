@@ -48,7 +48,7 @@ pub struct AuditFilter {
 pub struct AuditConfig {
     pub output_directory: String,
     pub log_size: usize,
-    pub log_format: String,
+    pub log_format: LogFormat,
     pub journal_size: usize,
 }
 
