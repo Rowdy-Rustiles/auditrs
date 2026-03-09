@@ -1,11 +1,11 @@
 use crate::config::{
     AuditConfig, CONFIG_DIR, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS,
-    LogFormat, MINIMUM_JOURNAL_SIZE, MINIMUM_LOG_SIZE, SetConfigVariables,
+    LogFormat, MINIMUM_ARCHIVE_SIZE, MINIMUM_JOURNAL_SIZE, MINIMUM_LOG_SIZE, SetConfigVariables,
 };
+use crate::utils::capitalize_first_letter;
 use anyhow::{Result, anyhow};
 use config::Config;
 use inquire::{Select, Text, validator::Validation};
-use crate::utils::capitalize_first_letter;
 use std::path::Path;
 use std::{fs, fs::OpenOptions, io::Write};
 
@@ -20,7 +20,6 @@ impl std::str::FromStr for LogFormat {
         }
     }
 }
-
 
 impl AuditConfig {
     pub fn load_config() -> Result<AuditConfig> {
@@ -50,7 +49,7 @@ impl AuditConfig {
     }
 
     /// TODO: decide if we want to use inquire for input or directly handle CLI arguments
-    /// For the set directory command, we can use the CLI arguments directly since most 
+    /// For the set directory command, we can use the CLI arguments directly since most
     /// terminals have autocompletions for paths. But for the set size and format commands,
     /// we use inquire, would we want unify this?
     pub fn set_config(key: SetConfigVariables) -> Result<()> {
@@ -65,19 +64,27 @@ impl AuditConfig {
             .ok_or_else(|| anyhow!("missing [settings] section"))?;
 
         match key {
-            SetConfigVariables::OutputDirectory { value } => {
+            SetConfigVariables::LogDirectory { value } => {
                 settings.insert("output_directory".into(), toml::Value::String(value));
+            }
+            SetConfigVariables::JournalDirectory { value } => {
+                settings.insert("journal_directory".into(), toml::Value::String(value));
+            }
+            SetConfigVariables::ArchiveDirectory { value } => {
+                settings.insert("archive_directory".into(), toml::Value::String(value));
             }
             SetConfigVariables::LogSize => {
                 let current_size = config.log_size;
                 let log_size = Text::new("Enter a new log size (in bytes):")
                     .with_help_message(&format!("Current log size: {} bytes", current_size))
-                    .with_validator(|input: &str| { // Enforce minimum log size (8 KB)
+                    .with_validator(|input: &str| {
+                        // Enforce minimum log size (8 KB)
                         match input.parse::<usize>() {
                             Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
-                            Ok(size) if size < MINIMUM_LOG_SIZE => {
-                                Ok(Validation::Invalid(format!("Log size must be at least {} bytes", MINIMUM_LOG_SIZE).into()))
-                            }
+                            Ok(size) if size < MINIMUM_LOG_SIZE => Ok(Validation::Invalid(
+                                format!("Log size must be at least {} bytes", MINIMUM_LOG_SIZE)
+                                    .into(),
+                            )),
                             Ok(_) => Ok(Validation::Valid),
                         }
                     })
@@ -89,27 +96,60 @@ impl AuditConfig {
             }
             SetConfigVariables::JournalSize => {
                 let current_size = config.journal_size;
-                let journal_size = Text::new("Enter a new journal size (in bytes):")
-                    .with_help_message(&format!("Current journal size: {} bytes", current_size))
-                    .with_validator(|input: &str| {
-                        match input.parse::<usize>() {
-                            Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
-                            Ok(size) if size < MINIMUM_JOURNAL_SIZE => {
-                                Ok(Validation::Invalid(format!("Journal size must be at least {} bytes", MINIMUM_JOURNAL_SIZE).into()))
-                            }
-                            Ok(_) => Ok(Validation::Valid),
-                        }
+                let journal_size = Text::new("Enter a new journal size (in logs):")
+                    .with_help_message(&format!("Current journal size: {} logs", current_size))
+                    .with_validator(|input: &str| match input.parse::<usize>() {
+                        Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
+                        Ok(size) if size < MINIMUM_JOURNAL_SIZE => Ok(Validation::Invalid(
+                            format!(
+                                "Journal size must be at least {} logs",
+                                MINIMUM_JOURNAL_SIZE
+                            )
+                            .into(),
+                        )),
+                        Ok(_) => Ok(Validation::Valid),
                     })
                     .prompt()
                     .map_err(|e| anyhow!("{}", e))?
                     .parse::<usize>()
                     .map_err(|e| anyhow!("{}", e))?;
-                settings.insert("journal_size".into(), toml::Value::Integer(journal_size as i64));
+                settings.insert(
+                    "journal_size".into(),
+                    toml::Value::Integer(journal_size as i64),
+                );
+            }
+            SetConfigVariables::ArchiveSize => {
+                let current_size = config.archive_size;
+                let archive_size = Text::new("Enter a new archive size (in logs):")
+                    .with_help_message(&format!("Current archive size: {} logs", current_size))
+                    .with_validator(|input: &str| match input.parse::<usize>() {
+                        Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
+                        Ok(size) if size < MINIMUM_ARCHIVE_SIZE => Ok(Validation::Invalid(
+                            format!(
+                                "Archive size must be at least {} logs",
+                                MINIMUM_ARCHIVE_SIZE
+                            )
+                            .into(),
+                        )),
+                        Ok(_) => Ok(Validation::Valid),
+                    })
+                    .prompt()
+                    .map_err(|e| anyhow!("{}", e))?
+                    .parse::<usize>()
+                    .map_err(|e| anyhow!("{}", e))?;
+                settings.insert(
+                    "archive_size".into(),
+                    toml::Value::Integer(archive_size as i64),
+                );
             }
             SetConfigVariables::LogFormat {} => {
                 let current_fmt = capitalize_first_letter(&config.log_format.to_string());
                 let log_format = Select::new("Select a log format", LOG_FORMATS.to_vec())
-                    .with_help_message(&format!("Current log format: {}]\n[{}", current_fmt, Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()))
+                    .with_help_message(&format!(
+                        "Current log format: {}]\n[{}",
+                        current_fmt,
+                        Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()
+                    ))
                     .prompt()
                     .map_err(|e| anyhow!("{}", e))?
                     .to_lowercase();
@@ -133,13 +173,17 @@ impl AuditConfig {
     pub fn get_config(key: Option<GetConfigVariables>) -> Result<()> {
         let config = load_config()?;
         match key {
-            Some(GetConfigVariables::OutputDirectory) => {
-                println!("{}", config.output_directory);
-            }
+            Some(GetConfigVariables::LogDirectory) => println!("{}", config.output_directory),
+            Some(GetConfigVariables::JournalDirectory) => println!("{}", config.journal_directory),
+            Some(GetConfigVariables::ArchiveDirectory) => println!("{}", config.archive_directory),
             Some(GetConfigVariables::LogSize) => println!("{} bytes", config.log_size),
-            Some(GetConfigVariables::LogFormat) => println!("{}", capitalize_first_letter(&config.log_format.to_string())),
-            Some(GetConfigVariables::JournalSize) => println!("{} bytes", config.journal_size),
-            None => println!("{:?}", config),
+            Some(GetConfigVariables::JournalSize) => println!("{} logs", config.journal_size),
+            Some(GetConfigVariables::ArchiveSize) => println!("{} logs", config.archive_size),
+            Some(GetConfigVariables::LogFormat) => println!(
+                "{}",
+                capitalize_first_letter(&config.log_format.to_string())
+            ),
+            None => println!("{}", config.to_string()),
         }
         Ok(())
     }
@@ -175,5 +219,20 @@ impl LogFormat {
             LogFormat::Simple => "slog".to_string(), // i like this
             LogFormat::Json => "json".to_string(),
         }
+    }
+}
+
+impl AuditConfig {
+    pub fn to_string(&self) -> String {
+        format!(
+            "Log format: {}\nLog directory: {}\nJournal directory: {}\nArchive directory: {}\nLog size: {} bytes\nJournal size: {} logs\nArchive size: {} logs",
+            capitalize_first_letter(&self.log_format.to_string()),
+            self.output_directory,
+            self.journal_directory,
+            self.archive_directory,
+            self.log_size,
+            self.journal_size,
+            self.archive_size
+        )
     }
 }

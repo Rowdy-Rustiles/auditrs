@@ -15,7 +15,7 @@ pub fn start_auditrs(reboot: bool) -> Result<()> {
 pub fn stop_auditrs(reboot: bool) -> Result<()> {
     stop_daemon()?;
     if !reboot {
-    colorize_println("Stopped auditRS daemon", Colors::BrightRedFg);
+        colorize_println("Stopped auditRS daemon", Colors::BrightRedFg);
     }
     Ok(())
 }

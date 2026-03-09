@@ -1,4 +1,4 @@
-use super::{AuditLogWriter, DEFAULT_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT};
+use super::{AuditLogWriter, DEFAULT_ACTIVE_DIR, DEFAULT_LOG_SIZE, DEFAULT_OUTPUT_FORMAT};
 use crate::config::LogFormat;
 use crate::config::State;
 use crate::correlator::AuditEvent;
@@ -6,16 +6,19 @@ use crate::utils::*;
 use anyhow::Result;
 use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
+use std::os::unix::fs::DirEntryExt;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
-use std::os::unix::fs::DirEntryExt;
 
 impl AuditLogWriter {
     pub fn new() -> anyhow::Result<Self> {
-        let state  = State::load_state()?;
+        let state = State::load_state()?;
         let log_dir = PathBuf::from(state.config.output_directory);
         create_dir_all(&log_dir)?;
-        let log_file = log_dir.join(format!("auditrs.{}", state.config.log_format.get_extension()));
+        let log_file = log_dir.join(format!(
+            "auditrs.{}",
+            state.config.log_format.get_extension()
+        ));
         let file_handle = OpenOptions::new()
             .create(true)
             .append(true)
@@ -82,9 +85,10 @@ impl AuditLogWriter {
     }
 
     fn active_log_path(&self) -> PathBuf {
-        self.destination.join(format!("auditrs.{}", self.output_format.get_extension()))
+        self.destination
+            .join(format!("auditrs.{}", self.output_format.get_extension()))
     }
-    
+
     /// Check log size for log rotation, needs to be rewritten with proper log rotation logic
     /// Overly complicated, needs to be rewritten and split
     fn check_log_size(&mut self) -> Result<()> {
@@ -98,11 +102,14 @@ impl AuditLogWriter {
             let ext = &self.output_format.get_extension();
             let archive_counter = std::fs::read_dir(&self.destination)?
                 .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    entry.path().extension().and_then(|e| e.to_str()) == Some(ext)
-                })
+                .filter(|entry| entry.path().extension().and_then(|e| e.to_str()) == Some(ext))
                 .count();
-            let archived_log = self.destination.join(format!("auditrs_{}_{}.{}", archive_counter, current_utc_string(), self.output_format.get_extension()));
+            let archived_log = self.destination.join(format!(
+                "auditrs_{}_{}.{}",
+                archive_counter,
+                current_utc_string(),
+                self.output_format.get_extension()
+            ));
             std::fs::rename(&active_log, &archived_log)?;
             self.file_handle = OpenOptions::new()
                 .create(true)

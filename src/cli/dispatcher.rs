@@ -51,10 +51,13 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
     match matches.subcommand() {
         Some(("get", get_m)) => {
             let key = match get_m.subcommand_name() {
-                Some("directory") => Some(GetConfigVariables::OutputDirectory),
-                Some("size") => Some(GetConfigVariables::LogSize),
                 Some("format") => Some(GetConfigVariables::LogFormat),
+                Some("log-directory") => Some(GetConfigVariables::LogDirectory),
+                Some("journal-directory") => Some(GetConfigVariables::JournalDirectory),
+                Some("archive-directory") => Some(GetConfigVariables::ArchiveDirectory),
+                Some("log-size") => Some(GetConfigVariables::LogSize),
                 Some("journal-size") => Some(GetConfigVariables::JournalSize),
+                Some("archive-size") => Some(GetConfigVariables::ArchiveSize),
                 _ => None,
             };
             get_config(key).map_err(|e| anyhow::anyhow!("{}", e))
@@ -66,22 +69,41 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
 
 fn handle_config_set(matches: &ArgMatches) -> Result<()> {
     let result = match matches.subcommand() {
-        Some(("directory", m)) => {
+        Some(("format", _m)) => {
+            set_config(SetConfigVariables::LogFormat).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("log-directory", m)) => {
             let value = m
                 .get_one::<String>("value")
                 .context("missing value")?
                 .clone();
-            set_config(SetConfigVariables::OutputDirectory { value })
+            set_config(SetConfigVariables::LogDirectory { value })
                 .map_err(|e| anyhow::anyhow!("{}", e))
         }
-        Some(("size", m)) => {
+        Some(("journal-directory", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .clone();
+            set_config(SetConfigVariables::JournalDirectory { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("archive-directory", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .clone();
+            set_config(SetConfigVariables::ArchiveDirectory { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("log-size", _m)) => {
             set_config(SetConfigVariables::LogSize).map_err(|e| anyhow::anyhow!("{}", e))
         }
-        Some(("format", m)) => {
-            set_config(SetConfigVariables::LogFormat).map_err(|e| anyhow::anyhow!("{}", e))
-        }
-        Some(("journal-size", m)) => {
+        Some(("journal-size", _m)) => {
             set_config(SetConfigVariables::JournalSize).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("archive-size", _m)) => {
+            set_config(SetConfigVariables::ArchiveSize).map_err(|e| anyhow::anyhow!("{}", e))
         }
         _ => Ok(()),
     };

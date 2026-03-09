@@ -186,16 +186,32 @@ fn build_config() -> ClapCommand {
         .subcommand(
             ClapCommand::new("get")
                 .about("Read config values")
-                .subcommand(ClapCommand::new("directory").about("Get the current log directory"))
-                .subcommand(ClapCommand::new("size").about("Get the current log size limit"))
                 .subcommand(ClapCommand::new("format").about("Get the current output format"))
-                .subcommand(ClapCommand::new("journal-size").about("Get the current journal size limit")),
+                .subcommand(
+                    ClapCommand::new("log-directory").about("Get the current log directory"),
+                )
+                .subcommand(
+                    ClapCommand::new("journal-directory")
+                        .about("Get the current journal directory"),
+                )
+                .subcommand(
+                    ClapCommand::new("archive-directory")
+                        .about("Get the current archive directory"),
+                )
+                .subcommand(ClapCommand::new("log-size").about("Get the current log size limit"))
+                .subcommand(
+                    ClapCommand::new("journal-size").about("Get the current journal size limit"),
+                )
+                .subcommand(
+                    ClapCommand::new("archive-size").about("Get the current archive size limit"),
+                ),
         )
         .subcommand(
             ClapCommand::new("set")
                 .about("Update config values, will reboot the daemon if the config was changed")
+                .subcommand(ClapCommand::new("format").about("Set the output format"))
                 .subcommand(
-                    ClapCommand::new("directory")
+                    ClapCommand::new("log-directory")
                         .about("Set the log directory")
                         .arg(
                             Arg::new("value")
@@ -205,14 +221,28 @@ fn build_config() -> ClapCommand {
                         ),
                 )
                 .subcommand(
-                    ClapCommand::new("size")
-                        .about("Set the log size limit")
+                    ClapCommand::new("journal-directory")
+                        .about("Set the journal directory")
+                        .arg(
+                            Arg::new("value")
+                                .value_name("VALUE")
+                                .required(true)
+                                .help("New journal directory path"),
+                        ),
                 )
-                .subcommand(ClapCommand::new("format").about("Set the output format"))
                 .subcommand(
-                    ClapCommand::new("journal-size")
-                        .about("Set the journal size limit")
+                    ClapCommand::new("archive-directory")
+                        .about("Set the archive directory")
+                        .arg(
+                            Arg::new("value")
+                                .value_name("VALUE")
+                                .required(true)
+                                .help("New archive directory path"),
+                        ),
                 )
+                .subcommand(ClapCommand::new("log-size").about("Set the log size limit"))
+                .subcommand(ClapCommand::new("journal-size").about("Set the journal size limit"))
+                .subcommand(ClapCommand::new("archive-size").about("Set the archive size limit"))
                 .arg_required_else_help(true),
         )
         .arg_required_else_help(true)
@@ -303,11 +333,11 @@ mod tests {
     }
 
     #[test]
-    fn parses_config_get_directory() {
+    fn parses_config_get_log_directory() {
         let cmd = build_cli();
         let matches = cmd
             .clone()
-            .try_get_matches_from(["auditrs", "config", "get", "directory"])
+            .try_get_matches_from(["auditrs", "config", "get", "log-directory"])
             .expect("arguments should parse");
 
         let ("config", cfg_m) = matches.subcommand().expect("expected config subcommand") else {
@@ -318,6 +348,6 @@ mod tests {
             unreachable!();
         };
 
-        assert_eq!(get_m.subcommand_name(), Some("directory"));
+        assert_eq!(get_m.subcommand_name(), Some("log-directory"));
     }
 }

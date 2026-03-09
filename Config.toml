@@ -8,6 +8,10 @@ An example Config.toml file for auditrs. In production, these are stored at /etc
 version = "0.3.0"
 
 [settings]
-log_format = "simple"
-log_size = 20
-output_directory = "/var/log/auditrs"
+log_format = "legacy"
+output_directory = "/var/log/auditrs/active"
+archive_directory = "/var/log/auditrs/archive"
+journal_directory = "/var/log/auditrs/journal"
+log_size = 4194304
+journal_size = 16
+archive_size = 16
