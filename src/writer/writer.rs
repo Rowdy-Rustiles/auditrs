@@ -41,8 +41,9 @@ impl AuditLogWriter {
             LogFormat::Simple => self.write_event_simple(event)?,
             LogFormat::Json => self.write_event_json(event)?,
         }
-        // TODO: We should be checking to see if writing an event would exceed the log size limit.
-        // if so, log rotation should be triggered then rather than after the fact.
+        // TODO: We should be checking to see if writing an event would exceed the log
+        // size limit. if so, log rotation should be triggered then rather than
+        // after the fact.
         self.check_log_size()
     }
 
@@ -91,8 +92,8 @@ impl AuditLogWriter {
             .join(format!("auditrs.{}", self.output_format.get_extension()))
     }
 
-    /// Check log size for log rotation, needs to be rewritten with proper log rotation logic
-    /// Overly complicated, needs to be rewritten and split
+    /// Check log size for log rotation, needs to be rewritten with proper log
+    /// rotation logic Overly complicated, needs to be rewritten and split
     fn check_log_size(&mut self) -> Result<()> {
         let active_log = self.active_log_path();
         let file_size = match std::fs::metadata(&active_log) {

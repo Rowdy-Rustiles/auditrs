@@ -41,17 +41,19 @@ impl AuditConfig {
             .build()
             .map_err(|e| anyhow!("{}", e))?;
 
-        // The TOML file has a top-level `[settings]` table; we map that into `AuditConfig`.
+        // The TOML file has a top-level `[settings]` table; we map that into
+        // `AuditConfig`.
         let settings = config
             .get::<AuditConfig>("settings")
             .map_err(|e| anyhow!("{}", e))?;
         Ok(settings)
     }
 
-    /// TODO: decide if we want to use inquire for input or directly handle CLI arguments
-    /// For the set directory command, we can use the CLI arguments directly since most
-    /// terminals have autocompletions for paths. But for the set size and format commands,
-    /// we use inquire, would we want unify this?
+    /// TODO: decide if we want to use inquire for input or directly handle CLI
+    /// arguments For the set directory command, we can use the CLI
+    /// arguments directly since most terminals have autocompletions for
+    /// paths. But for the set size and format commands, we use inquire,
+    /// would we want unify this?
     pub fn set_config(key: SetConfigVariables) -> Result<()> {
         // Config is loaded for the help messages, it could probably be removed later
         let config = load_config()?;
@@ -212,7 +214,8 @@ impl LogFormat {
     }
 
     /// Get the extension for the log file based on the log format
-    /// Each log format has a unique extension for easier identification and parsing.
+    /// Each log format has a unique extension for easier identification and
+    /// parsing.
     pub fn get_extension(&self) -> String {
         match self {
             LogFormat::Legacy => "log".to_string(),

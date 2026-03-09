@@ -3,8 +3,8 @@ pub mod parser;
 
 pub use audit_types::RecordType;
 
-/// Intermediate result of parsing an audit message; used by parser and parsed_record.
-/// This should be phased out
+/// Intermediate result of parsing an audit message; used by parser and
+/// parsed_record. This should be phased out
 #[derive(Debug)]
 pub struct RecordData {
     pub timestamp: std::time::SystemTime,

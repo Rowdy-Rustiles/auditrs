@@ -12,8 +12,9 @@ use crate::daemon::PID_FILE_NAME;
 use daemonize::{Daemonize, Outcome};
 
 /// Checks if the user has is running with root privileges.
-/// Users without permissions will write to relative paths, we want to avoid this.
-/// TODO: Ideally we check if the user has write access to the audit log directory.
+/// Users without permissions will write to relative paths, we want to avoid
+/// this. TODO: Ideally we check if the user has write access to the audit log
+/// directory.
 fn is_root() -> Result<()> {
     unsafe {
         if libc::geteuid() == 0 {
@@ -32,8 +33,9 @@ fn prepare_auditrs() -> Result<()> {
 }
 
 /// Creates a daemon process that runs in the background.
-/// Both the parent (main) and child (daemon) will return up the call stack with a result.
-/// The parent process will wait a moment and check if the daemon's PID file exists.
+/// Both the parent (main) and child (daemon) will return up the call stack with
+/// a result. The parent process will wait a moment and check if the daemon's
+/// PID file exists.
 pub fn start_daemon() -> Result<(), anyhow::Error> {
     is_root()?;
     prepare_auditrs()?;
@@ -49,7 +51,8 @@ pub fn start_daemon() -> Result<(), anyhow::Error> {
         .stdout(stdout)
         .stderr(stderr);
 
-    // Use execute() instead of start() so we can report the result before the parent process is killed.
+    // Use execute() instead of start() so we can report the result before the
+    // parent process is killed.
     match daemonize.execute() {
         Outcome::Parent(Ok(_)) => {
             // We're in the parent process - daemon was forked successfully.
@@ -129,7 +132,8 @@ fn pid_file_path() -> PathBuf {
 }
 
 // This is a file guard that will wrap the daemon's pid file.
-// Once it falls out of scope (i.e., daemon exits), the Drop trait will make sure the pid file gets deleted.
+// Once it falls out of scope (i.e., daemon exits), the Drop trait will make
+// sure the pid file gets deleted.
 struct FileGuard {
     file: std::fs::File,
     path: PathBuf,

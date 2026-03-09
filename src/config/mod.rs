@@ -50,7 +50,6 @@ pub struct AuditFilter {
 
 #[derive(Debug, Deserialize)]
 pub struct AuditConfig {
-    #[serde(alias = "output_directory")]
     pub active_directory: String,
     pub log_size: usize,
     pub log_format: LogFormat,

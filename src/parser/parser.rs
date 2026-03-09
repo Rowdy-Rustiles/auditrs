@@ -13,7 +13,8 @@ use nom::{
 };
 
 impl ParsedAuditRecord {
-    /// Returns (timestamp, serial) identifying the audit event this record belongs to.
+    /// Returns (timestamp, serial) identifying the audit event this record
+    /// belongs to.
     pub fn identifier(&self) -> (SystemTime, u16) {
         (self.timestamp, self.serial)
     }
@@ -38,7 +39,8 @@ impl TryFrom<RawAuditRecord> for ParsedAuditRecord {
     }
 }
 
-/// Parses the data payload of a RawAuditRecord into a hashmap of key-value pairs.
+/// Parses the data payload of a RawAuditRecord into a hashmap of key-value
+/// pairs.
 fn parse_kv(input: &str) -> HashMap<String, String> {
     let mut fields = HashMap::new();
     let mut chars = input.chars().peekable();
@@ -106,7 +108,8 @@ fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
 
     // Now parse the rest of the line as key-value pairs
     // Brute implementation: put everything into a single "kv" field.
-    // There will only be one line in the payload, so we can just take until the end of the line
+    // There will only be one line in the payload, so we can just take until the end
+    // of the line
 
     let (input, _) = space1(input)?; // consume the space after the header
 

@@ -16,8 +16,9 @@ impl Correlator {
         }
     }
 
-    /// Add a record to the buffer. If an entry for this event exists, append the
-    /// record and reset the timeout. Otherwise create a new buffer entry.
+    /// Add a record to the buffer. If an entry for this event exists, append
+    /// the record and reset the timeout. Otherwise create a new buffer
+    /// entry.
     pub fn push(&mut self, record: ParsedAuditRecord) {
         let id = record.identifier();
         let now = Instant::now();
@@ -35,7 +36,8 @@ impl Correlator {
     }
 
     /// Remove and return all buffer entries whose timeout has elapsed.
-    /// Call this periodically (e.g. from a timer task) to flush completed events.
+    /// Call this periodically (e.g. from a timer task) to flush completed
+    /// events.
     pub fn flush_expired(&mut self) -> Vec<super::AuditEvent> {
         let now = Instant::now();
         let expired: Vec<Identifier> = self

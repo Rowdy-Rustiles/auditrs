@@ -8,7 +8,8 @@ use inquire::{
 };
 use strum::IntoEnumIterator;
 
-/// Autocompleter for a fixed list of strings (e.g. existing filter record types from config).
+/// Autocompleter for a fixed list of strings (e.g. existing filter record types
+/// from config).
 #[derive(Clone)]
 pub struct StringListAutoCompleter {
     input: String,

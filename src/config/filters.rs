@@ -15,7 +15,8 @@ use strum::IntoEnumIterator;
 use toml;
 
 impl Filters {
-    /// Returns the list of record types currently defined in the filters (for autocomplete).
+    /// Returns the list of record types currently defined in the filters (for
+    /// autocomplete).
     pub fn record_types(&self) -> Vec<String> {
         self.0.iter().map(|f| f.record_type.clone()).collect()
     }
@@ -172,7 +173,8 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
     set_filter(filter)
 }
 
-/// Remove a filter via interactive prompt with fuzzy autocomplete over existing filters only.
+/// Remove a filter via interactive prompt with fuzzy autocomplete over existing
+/// filters only.
 pub fn remove_filter_interactive(state: &State) -> Result<()> {
     let existing = state.filters.record_types();
     if existing.is_empty() {
@@ -203,7 +205,8 @@ pub fn remove_filter_interactive(state: &State) -> Result<()> {
     remove_filter(&record_type)
 }
 
-/// Update an existing filter's action via interactive prompt; record type chosen from current filters only.
+/// Update an existing filter's action via interactive prompt; record type
+/// chosen from current filters only.
 pub fn update_filter_interactive(state: &State) -> Result<()> {
     let existing = state.filters.record_types();
     if existing.is_empty() {
@@ -282,7 +285,8 @@ fn validate_and_build_filter(
     })
 }
 
-/// Strip `/* ... */` block comments from raw file content (works across multiple lines).
+/// Strip `/* ... */` block comments from raw file content (works across
+/// multiple lines).
 fn strip_block_comments(content: &str) -> String {
     let mut result = String::with_capacity(content.len());
     let mut chars = content.chars().peekable();
@@ -373,7 +377,8 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     Ok(filters)
 }
 
-/// Import filters from an external and load them into filters.toml (used in `auditrs import <file>` command)
+/// Import filters from an external and load them into filters.toml (used in
+/// `auditrs import <file>` command)
 fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     let cleaned = strip_block_comments(content);
     let reader = std::io::BufReader::new(cleaned.as_bytes());
@@ -464,7 +469,8 @@ pub fn dump_filters(file: &str, state: &State) -> Result<()> {
     .map_err(|e| anyhow!("{}", e))?
     .to_lowercase();
 
-    // Replace any user-given extension with the selected extension from the terminal
+    // Replace any user-given extension with the selected extension from the
+    // terminal
     let base = Path::new(file).with_extension("");
     let path = base.with_extension(&filter_file_extension);
 
