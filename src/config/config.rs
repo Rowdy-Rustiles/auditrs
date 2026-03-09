@@ -65,7 +65,7 @@ impl AuditConfig {
 
         match key {
             SetConfigVariables::LogDirectory { value } => {
-                settings.insert("output_directory".into(), toml::Value::String(value));
+                settings.insert("active_directory".into(), toml::Value::String(value));
             }
             SetConfigVariables::JournalDirectory { value } => {
                 settings.insert("journal_directory".into(), toml::Value::String(value));
@@ -173,7 +173,7 @@ impl AuditConfig {
     pub fn get_config(key: Option<GetConfigVariables>) -> Result<()> {
         let config = load_config()?;
         match key {
-            Some(GetConfigVariables::LogDirectory) => println!("{}", config.output_directory),
+            Some(GetConfigVariables::LogDirectory) => println!("{}", config.active_directory),
             Some(GetConfigVariables::JournalDirectory) => println!("{}", config.journal_directory),
             Some(GetConfigVariables::ArchiveDirectory) => println!("{}", config.archive_directory),
             Some(GetConfigVariables::LogSize) => println!("{} bytes", config.log_size),
@@ -227,7 +227,7 @@ impl AuditConfig {
         format!(
             "Log format: {}\nLog directory: {}\nJournal directory: {}\nArchive directory: {}\nLog size: {} bytes\nJournal size: {} logs\nArchive size: {} logs",
             capitalize_first_letter(&self.log_format.to_string()),
-            self.output_directory,
+            self.active_directory,
             self.journal_directory,
             self.archive_directory,
             self.log_size,
