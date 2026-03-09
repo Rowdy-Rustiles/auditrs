@@ -24,7 +24,7 @@ version = "0.3.0"
 
 [settings]
 log_format = "legacy"
-output_directory = "/var/log/auditrs/active"
+active_directory = "/var/log/auditrs/active"
 archive_directory = "/var/log/auditrs/archive"
 journal_directory = "/var/log/auditrs/journal"
 log_size = 4194304
@@ -50,7 +50,8 @@ pub struct AuditFilter {
 
 #[derive(Debug, Deserialize)]
 pub struct AuditConfig {
-    pub output_directory: String,
+    #[serde(alias = "output_directory")]
+    pub active_directory: String,
     pub log_size: usize,
     pub log_format: LogFormat,
     pub journal_directory: String,

@@ -13,7 +13,7 @@ use std::time::UNIX_EPOCH;
 impl AuditLogWriter {
     pub fn new() -> anyhow::Result<Self> {
         let state = State::load_state()?;
-        let log_dir = PathBuf::from(state.config.output_directory);
+        let log_dir = PathBuf::from(state.config.active_directory);
         create_dir_all(&log_dir)?;
         let log_file = log_dir.join(format!(
             "auditrs.{}",
@@ -41,6 +41,8 @@ impl AuditLogWriter {
             LogFormat::Simple => self.write_event_simple(event)?,
             LogFormat::Json => self.write_event_json(event)?,
         }
+        // TODO: We should be checking to see if writing an event would exceed the log size limit.
+        // if so, log rotation should be triggered then rather than after the fact.
         self.check_log_size()
     }
 
