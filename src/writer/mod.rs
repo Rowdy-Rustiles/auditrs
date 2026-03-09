@@ -1,3 +1,5 @@
+//! Writer module for auditrs, responsible for writing events to disk.
+
 mod writer;
 
 use crate::config::LogFormat;
@@ -21,6 +23,7 @@ pub struct AuditLogWriter {
     log_size: usize,     // size of active log in bytes
     journal_size: usize, // number of logs to keep in journal
     archive_size: usize, // number of logs to keep in archive
+    archive_active: bool,
     active: AuditActive,
     journal: AuditJournal,
     archive: AuditArchive,
@@ -44,7 +47,15 @@ pub struct AuditJournal {
     paths: Vec<PathBuf>,
 }
 
+/// Represents audit archive, holding `archive_size` number of logs.
+/// Archive entries are journals that have been flushed to the archive.
+/// By default, the archive is not enabled; if enabled, the default logic is to
+/// further rotate evicted journal entries into the archive. Using `auditrs
+/// archive`, users can define a custom rotation policy for the archive.
 #[derive(Debug)]
 pub struct AuditArchive {
     paths: Vec<PathBuf>,
 }
+
+// TODO: Implement
+pub struct ArchiveConfig {}

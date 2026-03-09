@@ -27,6 +27,7 @@ log_format = "legacy"
 active_directory = "/var/log/auditrs/active"
 archive_directory = "/var/log/auditrs/archive"
 journal_directory = "/var/log/auditrs/journal"
+archive_active = false
 log_size = 4194304
 journal_size = 16
 archive_size = 16
@@ -48,7 +49,7 @@ pub struct AuditFilter {
     pub action: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AuditConfig {
     pub active_directory: String,
     pub log_size: usize,
@@ -57,6 +58,7 @@ pub struct AuditConfig {
     pub journal_size: usize,
     pub archive_directory: String,
     pub archive_size: usize,
+    pub archive_active: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,6 +70,7 @@ pub enum GetConfigVariables {
     JournalSize,
     ArchiveSize,
     LogFormat,
+    ArchiveActive,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,10 +82,11 @@ pub enum SetConfigVariables {
     JournalSize,
     ArchiveSize,
     LogFormat,
+    ArchiveActive,
 }
 
 // Unused, for reference
-#[derive(Copy, Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LogFormat {
     Legacy,

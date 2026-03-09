@@ -5,7 +5,7 @@ use crate::config::{
 use crate::utils::capitalize_first_letter;
 use anyhow::{Result, anyhow};
 use config::Config;
-use inquire::{Select, Text, validator::Validation};
+use inquire::{Confirm, Select, Text, validator::Validation};
 use std::path::Path;
 use std::{fs, fs::OpenOptions, io::Write};
 
@@ -22,6 +22,9 @@ impl std::str::FromStr for LogFormat {
 }
 
 impl AuditConfig {
+    // TODO: it would be nice if we could automatically resolve missing config key
+    // errors
+    /// Load the auditrs configuration from the config file.
     pub fn load_config() -> Result<AuditConfig> {
         if !Path::new(CONFIG_FILE).exists() {
             eprintln!("Config file not found at {CONFIG_FILE}, creating default");
@@ -144,6 +147,16 @@ impl AuditConfig {
                     toml::Value::Integer(archive_size as i64),
                 );
             }
+            SetConfigVariables::ArchiveActive => {
+                let current = config.archive_active;
+                let enabled =
+                    Confirm::new("Enable archive rotation (move old journals into archive)?")
+                        .with_default(current)
+                        .with_help_message(&format!("Current archive_active: {}", current))
+                        .prompt()
+                        .map_err(|e| anyhow!("{}", e))?;
+                settings.insert("archive_active".into(), toml::Value::Boolean(enabled));
+            }
             SetConfigVariables::LogFormat {} => {
                 let current_fmt = capitalize_first_letter(&config.log_format.to_string());
                 let log_format = Select::new("Select a log format", LOG_FORMATS.to_vec())
@@ -185,6 +198,7 @@ impl AuditConfig {
                 "{}",
                 capitalize_first_letter(&config.log_format.to_string())
             ),
+            Some(GetConfigVariables::ArchiveActive) => println!("{}", config.archive_active),
             None => println!("{}", config.to_string()),
         }
         Ok(())
@@ -228,14 +242,15 @@ impl LogFormat {
 impl AuditConfig {
     pub fn to_string(&self) -> String {
         format!(
-            "Log format: {}\nLog directory: {}\nJournal directory: {}\nArchive directory: {}\nLog size: {} bytes\nJournal size: {} logs\nArchive size: {} logs",
+            "Log format: {}\nLog directory: {}\nJournal directory: {}\nArchive directory: {}\nLog size: {} bytes\nJournal size: {} logs\nArchive size: {} logs\nArchive active: {}",
             capitalize_first_letter(&self.log_format.to_string()),
             self.active_directory,
             self.journal_directory,
             self.archive_directory,
             self.log_size,
             self.journal_size,
-            self.archive_size
+            self.archive_size,
+            self.archive_active
         )
     }
 }

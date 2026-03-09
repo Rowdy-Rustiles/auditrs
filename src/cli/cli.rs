@@ -204,6 +204,10 @@ fn build_config() -> ClapCommand {
                 )
                 .subcommand(
                     ClapCommand::new("archive-size").about("Get the current archive size limit"),
+                )
+                .subcommand(
+                    ClapCommand::new("archive-active")
+                        .about("Get whether archive rotation is enabled"),
                 ),
         )
         .subcommand(
@@ -243,6 +247,10 @@ fn build_config() -> ClapCommand {
                 .subcommand(ClapCommand::new("log-size").about("Set the log size limit"))
                 .subcommand(ClapCommand::new("journal-size").about("Set the journal size limit"))
                 .subcommand(ClapCommand::new("archive-size").about("Set the archive size limit"))
+                .subcommand(
+                    ClapCommand::new("archive-active")
+                        .about("Enable or disable archive rotation (interactive)"),
+                )
                 .arg_required_else_help(true),
         )
         .arg_required_else_help(true)

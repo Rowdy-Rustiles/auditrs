@@ -6,7 +6,9 @@ use crate::config::{
     get_config, get_filters, import_filters, remove_filter_interactive, set_config,
     update_filter_interactive,
 };
-use crate::daemon::control::{reboot_auditrs, start_auditrs, status_auditrs, stop_auditrs};
+use crate::daemon::control::{
+    reboot_auditrs, reload_auditrs, start_auditrs, status_auditrs, stop_auditrs,
+};
 
 /// Top-level entry point for handling CLI subcommands
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
@@ -58,6 +60,7 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
                 Some("log-size") => Some(GetConfigVariables::LogSize),
                 Some("journal-size") => Some(GetConfigVariables::JournalSize),
                 Some("archive-size") => Some(GetConfigVariables::ArchiveSize),
+                Some("archive-active") => Some(GetConfigVariables::ArchiveActive),
                 _ => None,
             };
             get_config(key).map_err(|e| anyhow::anyhow!("{}", e))
@@ -105,12 +108,15 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
         Some(("archive-size", _m)) => {
             set_config(SetConfigVariables::ArchiveSize).map_err(|e| anyhow::anyhow!("{}", e))
         }
+        Some(("archive-active", _m)) => {
+            set_config(SetConfigVariables::ArchiveActive).map_err(|e| anyhow::anyhow!("{}", e))
+        }
         _ => Ok(()),
     };
 
     // Reboot the daemon if the config was changed
     if result.is_ok() {
-        reboot_auditrs()?;
+        reload_auditrs()?;
     }
 
     result

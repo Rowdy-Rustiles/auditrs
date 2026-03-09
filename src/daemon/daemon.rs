@@ -102,18 +102,23 @@ pub fn stop_daemon() -> Result<()> {
 }
 
 /// True if the PID file exists and that process is still running.
-pub fn is_running() -> bool {
-    let path = pid_file_path();
-    let Ok(contents) = fs::read_to_string(&path) else {
-        return false;
-    };
-    let Ok(pid) = contents.trim().parse::<i32>() else {
-        return false;
-    };
-    unsafe { libc::kill(pid, 0) == 0 }
+pub fn is_running() -> Result<bool> {
+    let pid = read_pid()?;
+    Ok(unsafe { libc::kill(pid, 0) == 0 })
 }
 
-fn pid_file_path() -> PathBuf {
+/// Read the PID from the daemon's PID file.
+pub fn read_pid() -> Result<i32> {
+    let path = pid_file_path();
+    let contents = fs::read_to_string(&path)?;
+    Ok(contents.trim().parse::<i32>()?)
+}
+
+/// Get the path to the daemon's PID file.
+/// Includes various fallbacks for different user permissions/environments.
+/// However, we should ensure that the commands are always run by the root user.
+pub fn pid_file_path() -> PathBuf {
+    // Ideally this is the only block that runs.
     unsafe {
         if libc::geteuid() == 0 {
             return PathBuf::from("/var/run").join(PID_FILE_NAME);
