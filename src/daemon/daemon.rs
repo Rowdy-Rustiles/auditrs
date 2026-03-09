@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 /// working with systemctl or similar system services
 use std::fs::{self, File};
 use std::path::PathBuf;
-use std::process::{exit, Command};
+use std::process::{Command, exit};
 
 use crate::daemon::PID_FILE_NAME;
 
@@ -25,15 +25,9 @@ fn is_root() -> Result<()> {
 }
 
 fn prepare_auditrs() -> Result<()> {
-    Command::new("auditctl")
-        .arg("-e")
-        .arg("1")
-        .output()?;
+    Command::new("auditctl").arg("-e").arg("1").output()?;
 
-    Command::new("service")
-        .arg("auditd")
-        .arg("stop")
-        .output()?;
+    Command::new("service").arg("auditd").arg("stop").output()?;
     Ok(())
 }
 

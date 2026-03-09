@@ -385,7 +385,7 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
 
         if trimmed.is_empty() {
             continue;
-        } 
+        }
 
         let location = format!("{}:{}", path.display(), line_num + 1);
 
