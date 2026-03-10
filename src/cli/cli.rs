@@ -266,6 +266,9 @@ fn build_filter() -> ClapCommand {
                     "Record type to remove; omit for interactive choice from existing filters",
                 )),
         )
+        .subcommand(ClapCommand::new("update")
+        .about("Update a filter rule")
+        .long_about("Update an existing filter rule"))
         .subcommand(
             ClapCommand::new("import")
                 .about("Import filters from a file (supports .ars, .toml)")
@@ -300,6 +303,9 @@ fn build_watch() -> ClapCommand {
                     "Path to remove; omit for interactive choice from existing watches",
                 )),
         )
+         .subcommand(ClapCommand::new("update")
+        .about("Update a watch rule")
+        .long_about("Update an existing watch rule"))
         .subcommand(
             ClapCommand::new("import")
                 .about("Import watches from a file (supports .ars, .toml)")

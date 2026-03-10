@@ -284,7 +284,12 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
     set_watch(watch)
 }
 
-fn validate_and_build_watch(path: &str, action: &str, recursive: bool, location: &str) -> Result<AuditWatch> {
+fn validate_and_build_watch(
+    path: &str,
+    action: &str,
+    recursive: bool,
+    location: &str,
+) -> Result<AuditWatch> {
     let path = path.trim();
     let action = action.trim();
 
@@ -362,7 +367,10 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
         let recursive = match table.get("recursive").and_then(|v| v.as_bool()) {
             Some(b) => b,
             None => {
-                eprintln!("warning: {}: missing or non-boolean 'recursive' field, skipping", location);
+                eprintln!(
+                    "warning: {}: missing or non-boolean 'recursive' field, skipping",
+                    location
+                );
                 continue;
             }
         };
@@ -371,7 +379,7 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
             Ok(w) => watches.push(w),
             Err(e) => eprintln!("warning: {}, skipping", e),
         }
-        };
+    }
 
     Ok(watches)
 }
@@ -407,7 +415,10 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
         let (action, recursive) = match options.split_once(',') {
             Some(pair) => pair,
             None => {
-                eprintln!("warning: {}: invalid syntax '{}' (expected 'action, recursive'), skipping", location, trimmed);
+                eprintln!(
+                    "warning: {}: invalid syntax '{}' (expected 'action, recursive'), skipping",
+                    location, trimmed
+                );
                 continue;
             }
         };
@@ -476,7 +487,8 @@ pub fn dump_watches(file: &str, state: &State) -> Result<()> {
     .map_err(|e| anyhow!("{}", e))?
     .to_lowercase();
 
-    // Replace any user-given extension with the selected extension from the terminal
+    // Replace any user-given extension with the selected extension from the
+    // terminal
     let base = Path::new(file).with_extension("");
     let path = base.with_extension(&watch_file_extension);
 
