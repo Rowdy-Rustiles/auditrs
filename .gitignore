@@ -8,3 +8,4 @@ output/
 *.idea
 *.idea/
 ec2/
+tmp/

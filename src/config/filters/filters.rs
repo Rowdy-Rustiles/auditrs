@@ -1,9 +1,9 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
 use crate::config::{
-    ACTIONS, AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, Filters, RULES_FILE, State,
+    FilterAction, AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, Filters, RULES_FILE, State,
 };
 use crate::parser::audit_types::RecordType;
-use crate::utils::current_utc_string;
+use crate::utils::{current_utc_string, strip_block_comments};
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
@@ -32,7 +32,10 @@ impl Filters {
 
         if !Path::new(file_path).exists() {
             // No filters file yet – treat as empty set of filters.
-            return Ok(Filters(Vec::new()));
+            eprintln!("Filters file not found at {RULES_FILE}, creating empty rules file");
+            let filters = Filters(Vec::new());
+            persist_filters(&filters.0)?;
+            return Ok(filters);
         }
 
         let content = std::fs::read_to_string(file_path)?;
@@ -49,7 +52,8 @@ impl Filters {
                     .filter_map(|v| v.as_table())
                     .filter_map(|table| {
                         let record_type = table.get("record_type")?.as_str()?.to_string();
-                        let action = table.get("action")?.as_str()?.to_string();
+                        let action_str = table.get("action")?.as_str()?.to_string();
+                        let action = FilterAction::from_str(&action_str.to_lowercase()).ok()?;
                         Some(AuditFilter {
                             record_type,
                             action,
@@ -80,7 +84,10 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
                 "record_type".into(),
                 toml::Value::String(f.record_type.clone()),
             );
-            table.insert("action".into(), toml::Value::String(f.action.clone()));
+            table.insert(
+                "action".into(),
+                toml::Value::String(f.action.as_ref().to_string()),
+            );
             toml::Value::Table(table)
         })
         .collect();
@@ -127,7 +134,7 @@ pub fn get_filters(state: &State) -> Result<()> {
     } else {
         println!("Filters:");
         for filter in filters {
-            println!("    {}: {}", filter.record_type, filter.action);
+            println!("    {}: {}", filter.record_type, filter.action.as_ref());
         }
     }
     Ok(())
@@ -161,10 +168,11 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
         return Err(anyhow!("record type cannot be empty"));
     }
 
-    let action = Select::new("Select an action for this record type", ACTIONS.to_vec())
+    let actions: Vec<String> = FilterAction::iter().map(|a| a.as_ref().to_string()).collect();
+    let action_str = Select::new("Select an action for this record type", actions)
         .prompt()
-        .map_err(|e| anyhow!("{}", e))?
-        .to_lowercase();
+        .map_err(|e| anyhow!("{}", e))?;
+    let action = FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
 
     let filter = AuditFilter {
         record_type,
@@ -236,10 +244,11 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         .to_string()
         .to_lowercase();
 
-    let action = Select::new("Select new action for this record type", ACTIONS.to_vec())
+    let actions: Vec<String> = FilterAction::iter().map(|a| a.as_ref().to_string()).collect();
+    let action_str = Select::new("Select new action for this record type", actions)
         .prompt()
-        .map_err(|e| anyhow!("{}", e))?
-        .to_lowercase();
+        .map_err(|e| anyhow!("{}", e))?;
+    let action = FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
 
     let filter = AuditFilter {
         record_type,
@@ -271,52 +280,18 @@ fn validate_and_build_filter(
         )
     })?;
 
-    if !ACTIONS.contains(&action.to_lowercase().as_str()) {
-        return Err(anyhow!(
-            "{}: invalid action '{}' (expected 'allow' or 'block')",
+    let parsed_action = FilterAction::from_str(&action.to_lowercase()).map_err(|_| {
+        anyhow!(
+            "{}: invalid action '{}' (expected one of: allow, block)",
             location,
             action
-        ));
-    }
+        )
+    })?;
 
     Ok(AuditFilter {
         record_type: parsed_rt.as_audit_str().to_lowercase(),
-        action: action.to_lowercase(),
+        action: parsed_action,
     })
-}
-
-/// Strip `/* ... */` block comments from raw file content (works across
-/// multiple lines).
-fn strip_block_comments(content: &str) -> String {
-    let mut result = String::with_capacity(content.len());
-    let mut chars = content.chars().peekable();
-
-    while let Some(&c) = chars.peek() {
-        if c == '/' {
-            chars.next();
-            if chars.peek() == Some(&'*') {
-                chars.next();
-                let mut closed = false;
-                while let Some(inner) = chars.next() {
-                    if inner == '*' && chars.peek() == Some(&'/') {
-                        chars.next();
-                        closed = true;
-                        break;
-                    }
-                }
-                if !closed {
-                    eprintln!("warning: unterminated block comment (missing closing */)");
-                }
-            } else {
-                result.push('/');
-            }
-        } else {
-            result.push(c);
-            chars.next();
-        }
-    }
-
-    result
 }
 
 fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
@@ -509,7 +484,10 @@ fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
                         "record_type".into(),
                         toml::Value::String(f.record_type.clone()),
                     );
-                    filter_table.insert("action".into(), toml::Value::String(f.action.clone()));
+                    filter_table.insert(
+                        "action".into(),
+                        toml::Value::String(f.action.as_ref().to_string()),
+                    );
                     toml::Value::Table(filter_table)
                 })
                 .collect(),
@@ -521,7 +499,11 @@ fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
 fn to_ars_format(filters: &[AuditFilter]) -> Result<String> {
     let mut content = String::new();
     for filter in filters {
-        content.push_str(&format!("{}: {}\n", filter.record_type, filter.action));
+        content.push_str(&format!(
+            "{}: {}\n",
+            filter.record_type,
+            filter.action.as_ref()
+        ));
     }
     Ok(content)
 }

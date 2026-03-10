@@ -286,6 +286,26 @@ pub enum RecordType {
     /* =========================
      * Fallback
      * ========================= */
+
+    /* =========================
+     * Joint sets
+     * ========================= */
+    All,
+    ControlAll,
+    UserAll,
+    DaemonAll,
+    KernelAll,
+    SELinuxAll,
+    AppArmorAll,
+    KernelAnomalyAll,
+    IntegrityAll,
+    LegacyAll,
+    UserAnomalyAll,
+    AnomalyResponseAll,
+    UserLSPPAll,
+    UserCryptoAll,
+    VirtualizationAll,
+
     Unknown(u16),
 }
 
@@ -545,6 +565,23 @@ impl RecordType {
             Self::VirtDestroy => "VIRT_DESTROY",
             Self::VirtMigrateIn => "VIRT_MIGRATE_IN",
             Self::VirtMigrateOut => "VIRT_MIGRATE_OUT",
+
+            // Joint sets
+            Self::All => "*",
+            Self::ControlAll => "CONTROL_*",
+            Self::UserAll => "USER_*",
+            Self::DaemonAll => "DAEMON_*",
+            Self::KernelAll => "KERNEL_*",
+            Self::SELinuxAll => "SELINUX_*",
+            Self::AppArmorAll => "APPARMOR_*",
+            Self::KernelAnomalyAll => "KERNEL_ANOMALY_*",
+            Self::IntegrityAll => "INTEGRITY_*",
+            Self::LegacyAll => "LEGACY_*",
+            Self::UserAnomalyAll => "USER_ANOMALY_*",
+            Self::AnomalyResponseAll => "ANOMALY_RESPONSE_*",
+            Self::UserLSPPAll => "USER_LSPP_*",
+            Self::UserCryptoAll => "USER_CRYPTO_*",
+            Self::VirtualizationAll => "VIRTUALIZATION_*",
 
             // Fallback
             Self::Unknown(_) => "UNKNOWN",
@@ -1060,6 +1097,23 @@ impl From<RecordType> for u16 {
             VirtDestroy => 2505,
             VirtMigrateIn => 2506,
             VirtMigrateOut => 2507,
+
+            // Joint sets
+            All => 0,
+            ControlAll => 0,
+            UserAll => 0,
+            DaemonAll => 0,
+            KernelAll => 0,
+            SELinuxAll => 0,
+            AppArmorAll => 0,
+            KernelAnomalyAll => 0,
+            IntegrityAll => 0,
+            LegacyAll => 0,
+            UserAnomalyAll => 0,
+            AnomalyResponseAll => 0,
+            UserLSPPAll => 0,
+            UserCryptoAll => 0,
+            VirtualizationAll => 0,
 
             Unknown(v) => v,
         }

@@ -1,6 +1,7 @@
-use crate::config::{AuditWatch, RULES_FILE, Watches};
+use crate::config::{WatchAction, AuditWatch, RULES_FILE, Watches};
 use anyhow::Result;
 use std::path::Path;
+use std::str::FromStr;
 use toml;
 
 impl Watches {
@@ -43,7 +44,8 @@ impl Watches {
                     .filter_map(|v| v.as_table())
                     .filter_map(|table| {
                         let path = table.get("path")?.as_str()?.to_string();
-                        let action = table.get("action")?.as_str()?.to_string();
+                        let action_str = table.get("action")?.as_str()?.to_string();
+                        let action = WatchAction::from_str(&action_str.to_lowercase()).ok()?;
                         Some(AuditWatch {
                             path,
                             action,

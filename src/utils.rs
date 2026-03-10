@@ -40,3 +40,37 @@ pub fn capitalize_first_letter(s: &str) -> String {
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
 }
+
+/// Strip `/* ... */` block comments from raw file content (works across
+/// multiple lines).
+pub fn strip_block_comments(content: &str) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut chars = content.chars().peekable();
+
+    while let Some(&c) = chars.peek() {
+        if c == '/' {
+            chars.next();
+            if chars.peek() == Some(&'*') {
+                chars.next();
+                let mut closed = false;
+                while let Some(inner) = chars.next() {
+                    if inner == '*' && chars.peek() == Some(&'/') {
+                        chars.next();
+                        closed = true;
+                        break;
+                    }
+                }
+                if !closed {
+                    eprintln!("warning: unterminated block comment (missing closing */)");
+                }
+            } else {
+                result.push('/');
+            }
+        } else {
+            result.push(c);
+            chars.next();
+        }
+    }
+
+    result
+}

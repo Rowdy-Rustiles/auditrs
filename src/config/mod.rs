@@ -20,11 +20,11 @@ pub mod watches;
 
 pub use config::{get_config, load_config, set_config};
 pub use filters::{
-    AuditFilter, Filters, add_filter_interactive, dump_filters, get_filters, import_filters,
-    load_filters, remove_filter_interactive, update_filter_interactive,
+    FilterAction, AuditFilter, Filters, add_filter_interactive, dump_filters, get_filters,
+    import_filters, load_filters, remove_filter_interactive, update_filter_interactive,
 };
 use serde::Deserialize;
-pub use watches::{AuditWatch, Watches, load_watches};
+pub use watches::{WatchAction, AuditWatch, Watches, load_watches,};
 
 /// The minimum log size for the auditrs daemon.
 pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
@@ -41,7 +41,7 @@ pub const RULES_FILE: &str = "/etc/auditrs/rules.toml";
 /// The file extensions that can be used for importing and dumping filters.
 pub const FILTER_FILE_EXTENSIONS: &[&str] = &["toml", "ars"];
 /// The actions available for filters and watches.
-pub const ACTIONS: &[&str] = &["allow", "block"];
+pub const FILTER_ACTIONS: &[&str] = &["allow", "block", "sample", "redact", "route_secondary", "tag", "count_only", "alert"];
 /// The log formats for the auditrs output logs.
 pub const LOG_FORMATS: &[&str] = &["Legacy", "Simple", "Json"];
 /// The default configuration for the auditrs daemon.
@@ -141,9 +141,11 @@ pub enum SetConfigVariables {
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LogFormat {
-    /// The legacy log format, copies auditd's formatting for backwards compatibility. Produces a `.log` log file.
+    /// The legacy log format, copies auditd's formatting for backwards
+    /// compatibility. Produces a `.log` log file.
     Legacy,
-    /// The simple log format, intended for human readability. Produces a `.slog` log file.
+    /// The simple log format, intended for human readability. Produces a
+    /// `.slog` log file.
     Simple,
     /// Formats audit events as JSON objects. Produces a `.json` log file.
     Json,
