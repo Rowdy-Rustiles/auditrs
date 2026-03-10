@@ -110,7 +110,8 @@ fn handle_message(
 
     // ParsedAuditRecord
     if let NetlinkPayload::InnerMessage(inner) = &msg.payload {
-        // We want to match for both Event and Other enum variants to avoid ignoring potentially useful data.
+        // We want to match for both Event and Other enum variants to avoid ignoring
+        // potentially useful data.
         let data = match inner {
             AuditMessage::Event((_, kvs)) => kvs.to_string(),
             AuditMessage::Other((_, data)) => data.clone(),
@@ -146,7 +147,8 @@ fn handle_message(
 }
 
 // Append content to a file, creating the file if it doesn't exist.
-// Takes in an option just to make calling code cleaner - if the path is None, it does nothing.
+// Takes in an option just to make calling code cleaner - if the path is None,
+// it does nothing.
 fn append_to_file(path: Option<String>, content: &str) -> Result<()> {
     if let Some(path) = path {
         ensure_parent_dir(&path)?;

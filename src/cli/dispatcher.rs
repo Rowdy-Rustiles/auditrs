@@ -1,19 +1,30 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::ArgMatches;
 
-use crate::daemon::daemon::{is_running, start_daemon, stop_daemon};
+use crate::config::{
+    GetConfigVariables, LogFormat, SetConfigVariables, State, add_filter_interactive,
+    add_watch_interactive, dump_filters, dump_watches, get_config, get_filters, get_watches,
+    import_filters, import_watches, remove_filter_interactive, remove_watch_interactive,
+    set_config, update_filter_interactive, update_watch_interactive,
+};
+use crate::daemon::control::{
+    reboot_auditrs, reload_auditrs, start_auditrs, status_auditrs, stop_auditrs,
+};
 
 /// Top-level entry point for handling CLI subcommands
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
+    let state = State::load_state()?;
     match matches.subcommand() {
-        Some(("start", _)) => start_auditrs()?,
-        Some(("stop", _)) => stop_auditrs()?,
+        Some(("start", _)) => start_auditrs(false)?,
+        Some(("stop", _)) => stop_auditrs(false)?,
         Some(("reboot", _)) => reboot_auditrs()?,
         Some(("status", _)) => status_auditrs()?,
         Some(("dump", sub_m)) => handle_dump(sub_m)?,
         Some(("search", sub_m)) => handle_search(sub_m)?,
         Some(("report", sub_m)) => handle_report(sub_m)?,
         Some(("config", sub_m)) => handle_config(sub_m)?,
+        Some(("filter", sub_m)) => handle_filter(sub_m, &state)?,
+        Some(("watch", sub_m)) => handle_watch(sub_m, &state)?,
         None => {
             unreachable!("cli implementation should prevent this");
         }
@@ -23,33 +34,7 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn start_auditrs() -> Result<()> {
-    start_daemon()
-}
-
-fn stop_auditrs() -> Result<()> {
-    stop_daemon()?;
-    println!("Stopped auditRS daemon");
-    Ok(())
-}
-
-fn reboot_auditrs() -> Result<()> {
-    println!("Rebooting auditRS");
-    let _ = stop_auditrs();
-    start_auditrs()
-}
-
-fn status_auditrs() -> Result<()> {
-    println!(
-        "auditRS is {}",
-        if is_running() {
-            "running"
-        } else {
-            "not running"
-        }
-    );
-    Ok(())
-}
+/// Tools subcommands, to be moved to /tools when written
 
 fn handle_dump(_matches: &ArgMatches) -> Result<()> {
     println!("Dump, WIP");
@@ -66,7 +51,115 @@ fn handle_report(_matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn handle_config(_matches: &ArgMatches) -> Result<()> {
-    println!("Config, WIP");
-    Ok(())
+fn handle_config(matches: &ArgMatches) -> Result<()> {
+    match matches.subcommand() {
+        Some(("get", get_m)) => {
+            let key = match get_m.subcommand_name() {
+                Some("format") => Some(GetConfigVariables::LogFormat),
+                Some("log-directory") => Some(GetConfigVariables::LogDirectory),
+                Some("journal-directory") => Some(GetConfigVariables::JournalDirectory),
+                Some("primary-directory") => Some(GetConfigVariables::PrimaryDirectory),
+                Some("log-size") => Some(GetConfigVariables::LogSize),
+                Some("journal-size") => Some(GetConfigVariables::JournalSize),
+                Some("primary-size") => Some(GetConfigVariables::PrimarySize),
+                _ => None,
+            };
+            get_config(key).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("set", set_m)) => handle_config_set(set_m),
+        _ => Ok(()),
+    }
+}
+
+fn handle_config_set(matches: &ArgMatches) -> Result<()> {
+    let result = match matches.subcommand() {
+        Some(("format", _m)) => {
+            set_config(SetConfigVariables::LogFormat).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("log-directory", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .clone();
+            set_config(SetConfigVariables::LogDirectory { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("journal-directory", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .clone();
+            set_config(SetConfigVariables::JournalDirectory { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("primary-directory", m)) => {
+            let value = m
+                .get_one::<String>("value")
+                .context("missing value")?
+                .clone();
+            set_config(SetConfigVariables::PrimaryDirectory { value })
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("log-size", _m)) => {
+            set_config(SetConfigVariables::LogSize).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("journal-size", _m)) => {
+            set_config(SetConfigVariables::JournalSize).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        Some(("primary-size", _m)) => {
+            set_config(SetConfigVariables::PrimarySize).map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        _ => Ok(()),
+    };
+
+    // Reboot the daemon if the config was changed
+    if result.is_ok() {
+        reload_auditrs()?;
+    }
+
+    result
+}
+
+fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
+    match matches.subcommand() {
+        Some(("get", _sub_m)) => get_filters(state),
+        Some(("add", _sub_m)) => add_filter_interactive(state),
+        Some(("update", _sub_m)) => update_filter_interactive(state),
+        Some(("remove", _sub_m)) => remove_filter_interactive(state),
+        Some(("import", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            import_filters(file)
+        }
+        Some(("dump", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            dump_filters(file, state)
+        }
+        _ => unreachable!("cli implementation should prevent this"),
+    }
+}
+
+fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
+    match matches.subcommand() {
+        Some(("get", _sub_m)) => get_watches(state),
+        Some(("add", _sub_m)) => add_watch_interactive(state),
+        Some(("update", _sub_m)) => update_watch_interactive(state),
+        Some(("remove", _sub_m)) => remove_watch_interactive(state),
+        Some(("import", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            import_watches(file)
+        }
+        Some(("dump", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            dump_watches(file, state)
+        }
+        _ => unreachable!("cli implementation should prevent this"),
+    }
 }

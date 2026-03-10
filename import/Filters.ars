@@ -1,0 +1,16 @@
+/*
+This file is used for importing rules in bulk to auditrs's filtering function.
+The format for filtering actions takes the form:
+
+record_type: action
+
+Available record types can be found at:
+Available action types are: allow, block
+The inputs for either are case-insensitive.
+
+By default, all auditrs record types are allowed by default.
+*/
+
+syscall: block
+add_group: block
+cwd: block

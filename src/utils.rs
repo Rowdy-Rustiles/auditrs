@@ -19,6 +19,11 @@ pub fn systemtime_to_utc_string(systemtime: SystemTime) -> String {
     dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
 }
 
+pub fn current_utc_string() -> String {
+    let dt: DateTime<Utc> = Utc::now();
+    dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
+}
+
 pub fn systemtime_to_timestamp_string(systime: SystemTime) -> Result<String> {
     let duration = systime.duration_since(UNIX_EPOCH)?;
     Ok(format!(
@@ -26,4 +31,46 @@ pub fn systemtime_to_timestamp_string(systime: SystemTime) -> Result<String> {
         duration.as_secs(),
         duration.subsec_millis()
     ))
+}
+
+pub fn capitalize_first_letter(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+    }
+}
+
+/// Strip `/* ... */` block comments from raw file content (works across
+/// multiple lines).
+pub fn strip_block_comments(content: &str) -> String {
+    let mut result = String::with_capacity(content.len());
+    let mut chars = content.chars().peekable();
+
+    while let Some(&c) = chars.peek() {
+        if c == '/' {
+            chars.next();
+            if chars.peek() == Some(&'*') {
+                chars.next();
+                let mut closed = false;
+                while let Some(inner) = chars.next() {
+                    if inner == '*' && chars.peek() == Some(&'/') {
+                        chars.next();
+                        closed = true;
+                        break;
+                    }
+                }
+                if !closed {
+                    eprintln!("warning: unterminated block comment (missing closing */)");
+                }
+            } else {
+                result.push('/');
+            }
+        } else {
+            result.push(c);
+            chars.next();
+        }
+    }
+
+    result
 }

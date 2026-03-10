@@ -1,4 +1,5 @@
-//! Basic tests that ensure test-source.log (a sample of binary audit data captured from the kernel) is valid.
+//! Basic tests that ensure test-source.log (a sample of binary audit data
+//! captured from the kernel) is valid.
 
 use audit::packet::AuditMessage;
 use netlink_packet_core::NetlinkMessage;
@@ -48,7 +49,8 @@ pub fn message_to_readable(msg: &NetlinkMessage<AuditMessage>) -> String {
 }
 
 /// Deserializes the source log and returns each message in a readable format.
-/// For the test that use these, run `cargo test --test test_source_log -- --nocapture` to see the output.
+/// For the test that use these, run `cargo test --test test_source_log --
+/// --nocapture` to see the output.
 pub fn source_log_to_readable(path: &Path) -> Result<Vec<String>, String> {
     let messages = deserialize_source_log(path)?;
     Ok(messages

@@ -55,10 +55,10 @@ pub struct AuditEvent {
     pub records: Vec<ParsedAuditRecord>,
 }
 
-/// A struct that serves as a buffer for correlating the audit records within it into
-/// audit events. Records are grouped by (timestamp, serial). Each buffer entry's
-/// timeout is reset to TIMEOUT whenever a new record is added. When an entry's
-/// timeout elapses, it is flushed as an AuditEvent.
+/// A struct that serves as a buffer for correlating the audit records within it
+/// into audit events. Records are grouped by (timestamp, serial). Each buffer
+/// entry's timeout is reset to TIMEOUT whenever a new record is added. When an
+/// entry's timeout elapses, it is flushed as an AuditEvent.
 pub struct Correlator {
     pub(crate) event_buffer: HashMap<(SystemTime, u16), (Vec<ParsedAuditRecord>, Instant)>,
 }

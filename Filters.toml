@@ -1,0 +1,21 @@
+/*
+
+An example Config.toml file for auditrs. In production, these are stored at /etc/auditrs/filters.toml
+
+*/
+
+[[filters]]
+action = "block"
+record_type = "syscall"
+
+[[filters]]
+action = "block"
+record_type = "add_group"
+
+[[filters]]
+action = "block"
+record_type = "cwd"
+
+[[watches]]
+action = "report"
+path = "./src/correlator/"
