@@ -1,6 +1,5 @@
-use crate::config::State;
 use crate::config::input_utils::FilePathCompleter;
-use crate::config::{AuditWatch, CONFIG_DIR, RULES_FILE, WatchAction, Watches};
+use crate::config::{AuditWatch, CONFIG_DIR, RULES_FILE, State, WatchAction, Watches};
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{Confirm, formatter::StringFormatter, validator::Validation};
@@ -78,7 +77,19 @@ pub fn load_watches() -> Result<Watches> {
 
 fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
     let file_path = RULES_FILE;
+    // Create a default config folder at /etc/auditrs if it doesn't exist
     fs::create_dir_all(CONFIG_DIR)?;
+
+    // Load existing rules file for the preservation of other sections
+    let mut root_table = if Path::new(file_path).exists() {
+        let existing = std::fs::read_to_string(file_path)?;
+        match toml::from_str::<toml::Value>(&existing) {
+            Ok(toml::Value::Table(table)) => table,
+            _ => toml::map::Map::new(),
+        }
+    } else {
+        toml::map::Map::new()
+    };
 
     let array: Vec<toml::Value> = watches
         .iter()
@@ -93,12 +104,12 @@ fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
         })
         .collect();
 
-    let mut root = toml::map::Map::new();
-    root.insert("watches".into(), toml::Value::Array(array));
+    // Overwrite just the `watches` section while preserving others (e.g. `filters`)
+    root_table.insert("watches".into(), toml::Value::Array(array));
 
     std::fs::write(
         file_path,
-        toml::to_string_pretty(&toml::Value::Table(root))?,
+        toml::to_string_pretty(&toml::Value::Table(root_table))?,
     )?;
     Ok(())
 }
@@ -170,7 +181,12 @@ pub fn get_watches(state: &State) -> Result<()> {
         println!("Watches:");
         for watch in watches {
             let recursive_str = if watch.recursive { "Yes" } else { "No" };
-            println!("    {}: \n\tAction: {} \n\tRecursive?: {}", watch.path, watch.action.as_ref(), recursive_str);
+            println!(
+                "    {}: \n\tAction: {} \n\tRecursive?: {}",
+                watch.path,
+                watch.action.as_ref(),
+                recursive_str
+            );
         }
     }
     Ok(())

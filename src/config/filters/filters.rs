@@ -7,8 +7,8 @@ use crate::utils::{current_utc_string, strip_block_comments};
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
-use std::fs::{self, OpenOptions};
-use std::io::{BufRead, Write};
+use std::fs;
+use std::io::BufRead;
 use std::path::Path;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
@@ -74,7 +74,19 @@ pub fn load_filters() -> Result<Filters> {
 
 fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
     let file_path = RULES_FILE;
+    // Create a default config folder at /etc/auditrs if it doesn't exist
     fs::create_dir_all(CONFIG_DIR)?;
+
+    // Load existing rules file for the preservation of other sections
+    let mut root_table = if Path::new(file_path).exists() {
+        let existing = std::fs::read_to_string(file_path)?;
+        match toml::from_str::<toml::Value>(&existing) {
+            Ok(toml::Value::Table(table)) => table,
+            _ => toml::map::Map::new(),
+        }
+    } else {
+        toml::map::Map::new()
+    };
 
     let array: Vec<toml::Value> = filters
         .iter()
@@ -92,12 +104,12 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
         })
         .collect();
 
-    let mut root = toml::map::Map::new();
-    root.insert("filters".into(), toml::Value::Array(array));
+    // Overwrite just the `filters` section while preserving others (e.g. `watches`)
+    root_table.insert("filters".into(), toml::Value::Array(array));
 
     std::fs::write(
         file_path,
-        toml::to_string_pretty(&toml::Value::Table(root))?,
+        toml::to_string_pretty(&toml::Value::Table(root_table))?,
     )?;
     Ok(())
 }

@@ -17,5 +17,5 @@ action = "block"
 record_type = "cwd"
 
 [[watches]]
-path = "/etc/passwords"
 action = "report"
+path = "./src/correlator/"
