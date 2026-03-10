@@ -12,9 +12,5 @@ fn main() -> Result<()> {
     let mut cmd = build_cli();
     let matches = cmd.clone().get_matches();
 
-    if let Err(e) = dispatcher::dispatch(&matches) {
-        eprintln!("Error: {e:?}");
-    }
-
-    Ok(())
+    dispatcher::dispatch(&matches)
 }
