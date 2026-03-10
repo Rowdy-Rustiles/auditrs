@@ -254,12 +254,7 @@ fn build_filter() -> ClapCommand {
         .about("Commands for managing log filters")
         .long_about("Commands for managing log filters\nDocumentation about the record types that can be used in filters can be\nfound at: https://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md")
         .subcommand(
-            ClapCommand::new("get").about("Show current filters").arg(
-                Arg::new("value")
-                    .value_name("VALUE")
-                    .required(false)
-                    .help("Optional single value to filter by"),
-            ),
+            ClapCommand::new("get").about("Show current filters"),
         )
         .subcommand(ClapCommand::new("add")
         .about("Add a filter rule")
@@ -293,12 +288,7 @@ fn build_watch() -> ClapCommand {
         .about("Commands for managing log watches")
         .long_about("Commands for managing log watches\nDocumentation about watches can be\nfound at: TO IMPLEMENT")
         .subcommand(
-            ClapCommand::new("get").about("Show current watches").arg(
-                Arg::new("value")
-                    .value_name("VALUE")
-                    .required(false)
-                    .help("Optional single value to filter by"),
-            ),
+            ClapCommand::new("get").about("Show current watches"),
         )
         .subcommand(ClapCommand::new("add")
         .about("Add a watch rule")
