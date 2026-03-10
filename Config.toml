@@ -10,8 +10,8 @@ version = "0.3.0"
 [settings]
 log_format = "legacy"
 active_directory = "/var/log/auditrs/active"
-archive_directory = "/var/log/auditrs/archive"
+primary_directory = "/var/log/auditrs/primary"
 journal_directory = "/var/log/auditrs/journal"
 log_size = 4194304
 journal_size = 16
-archive_size = 16
+primary_size = 67108864

@@ -8,25 +8,24 @@ use std::path::PathBuf;
 
 const DEFAULT_ACTIVE_DIR: &str = "/var/log/auditrs/active";
 const DEFAULT_JOURNAL_DIR: &str = "/var/log/auditrs/journal";
-const DEFAULT_ARCHIVE_DIR: &str = "/var/log/auditrs/archive";
+const DEFAULT_PRIMARY_DIR: &str = "/var/log/auditrs/primary";
 const DEFAULT_LOG_FORMAT: LogFormat = LogFormat::Simple;
 const DEFAULT_LOG_SIZE: usize = 6 * 1024 * 1024; // 6 MB
 
 /// Main writer for audit logs, handles writing to the active log, journal, and
-/// archive. The audit log writer is the responsible for the managing log
+/// primary store. The audit log writer is responsible for managing log
 /// rotations, enforcing log size limits, and handling long term log storage.
 pub struct AuditLogWriter {
     log_format: LogFormat,
     active_directory: PathBuf,
     journal_directory: PathBuf,
-    archive_directory: PathBuf,
+    primary_directory: PathBuf,
     log_size: usize,     // size of active log in bytes
     journal_size: usize, // number of logs to keep in journal
-    archive_size: usize, // number of logs to keep in archive
-    archive_active: bool,
+    primary_size: usize, // number of logs to keep in primary store
     active: AuditActive,
     journal: AuditJournal,
-    archive: AuditArchive,
+    primary: AuditPrimary,
 }
 
 /// Represents the active log immediately written to by the daemon.
@@ -47,15 +46,13 @@ pub struct AuditJournal {
     paths: Vec<PathBuf>,
 }
 
-/// Represents audit archive, holding `archive_size` number of logs.
-/// Archive entries are journals that have been flushed to the archive.
-/// By default, the archive is not enabled; if enabled, the default logic is to
-/// further rotate evicted journal entries into the archive. Using `auditrs
-/// archive`, users can define a custom rotation policy for the archive.
+/// Represents long-term primary storage, holding `primary_size` number of logs.
+/// Primary entries are journals that have been flushed to primary storage.
+/// In the future, a custom rotation policy for primary storage may be added.
 #[derive(Debug)]
-pub struct AuditArchive {
+pub struct AuditPrimary {
     paths: Vec<PathBuf>,
 }
 
 // TODO: Implement
-pub struct ArchiveConfig {}
+pub struct PrimaryConfig {}

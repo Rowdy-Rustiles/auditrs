@@ -195,19 +195,15 @@ fn build_config() -> ClapCommand {
                         .about("Get the current journal directory"),
                 )
                 .subcommand(
-                    ClapCommand::new("archive-directory")
-                        .about("Get the current archive directory"),
+                    ClapCommand::new("primary-directory")
+                        .about("Get the current primary directory"),
                 )
                 .subcommand(ClapCommand::new("log-size").about("Get the current log size limit"))
                 .subcommand(
                     ClapCommand::new("journal-size").about("Get the current journal size limit"),
                 )
                 .subcommand(
-                    ClapCommand::new("archive-size").about("Get the current archive size limit"),
-                )
-                .subcommand(
-                    ClapCommand::new("archive-active")
-                        .about("Get whether archive rotation is enabled"),
+                    ClapCommand::new("primary-size").about("Get the current primary size limit"),
                 ),
         )
         .subcommand(
@@ -235,22 +231,18 @@ fn build_config() -> ClapCommand {
                         ),
                 )
                 .subcommand(
-                    ClapCommand::new("archive-directory")
-                        .about("Set the archive directory")
+                    ClapCommand::new("primary-directory")
+                        .about("Set the primary directory")
                         .arg(
                             Arg::new("value")
                                 .value_name("VALUE")
                                 .required(true)
-                                .help("New archive directory path"),
+                                .help("New primary directory path"),
                         ),
                 )
                 .subcommand(ClapCommand::new("log-size").about("Set the log size limit"))
                 .subcommand(ClapCommand::new("journal-size").about("Set the journal size limit"))
-                .subcommand(ClapCommand::new("archive-size").about("Set the archive size limit"))
-                .subcommand(
-                    ClapCommand::new("archive-active")
-                        .about("Enable or disable archive rotation (interactive)"),
-                )
+                .subcommand(ClapCommand::new("primary-size").about("Set the primary size limit"))
                 .arg_required_else_help(true),
         )
         .arg_required_else_help(true)

@@ -10,9 +10,9 @@ pub use filters::{
 };
 use serde::Deserialize;
 
-pub const MINIMUM_LOG_SIZE: usize = 8096; // 8 KB
+pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
 pub const MINIMUM_JOURNAL_SIZE: usize = 16; // 16 logs
-pub const MINIMUM_ARCHIVE_SIZE: usize = 16; // 16 logs
+pub const MINIMUM_PRIMARY_SIZE: usize = 8388608; // 8 MB
 pub const CONFIG_DIR: &str = "/etc/auditrs";
 pub const CONFIG_FILE: &str = "/etc/auditrs/config.toml";
 pub const FILTERS_FILE: &str = "/etc/auditrs/filters.toml";
@@ -25,12 +25,11 @@ version = "0.3.0"
 [settings]
 log_format = "legacy"
 active_directory = "/var/log/auditrs/active"
-archive_directory = "/var/log/auditrs/archive"
+primary_directory = "/var/log/auditrs/primary"
 journal_directory = "/var/log/auditrs/journal"
-archive_active = false
 log_size = 4194304
 journal_size = 16
-archive_size = 16
+primary_size = 67108864
 "#;
 
 #[derive(Debug)]
@@ -56,33 +55,30 @@ pub struct AuditConfig {
     pub log_format: LogFormat,
     pub journal_directory: String,
     pub journal_size: usize,
-    pub archive_directory: String,
-    pub archive_size: usize,
-    pub archive_active: bool,
+    pub primary_directory: String,
+    pub primary_size: usize,
 }
 
 #[derive(Debug, Deserialize)]
 pub enum GetConfigVariables {
     LogDirectory,
     JournalDirectory,
-    ArchiveDirectory,
+    PrimaryDirectory,
     LogSize,
     JournalSize,
-    ArchiveSize,
+    PrimarySize,
     LogFormat,
-    ArchiveActive,
 }
 
 #[derive(Debug, Deserialize)]
 pub enum SetConfigVariables {
     LogDirectory { value: String },
     JournalDirectory { value: String },
-    ArchiveDirectory { value: String },
+    PrimaryDirectory { value: String },
     LogSize,
     JournalSize,
-    ArchiveSize,
+    PrimarySize,
     LogFormat,
-    ArchiveActive,
 }
 
 // Unused, for reference

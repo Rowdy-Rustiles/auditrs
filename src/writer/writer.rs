@@ -1,6 +1,6 @@
 //! Writer module implementation.
 
-use super::{AuditActive, AuditArchive, AuditJournal, AuditLogWriter};
+use super::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary};
 use crate::config::AuditConfig;
 use crate::config::LogFormat;
 use crate::config::State;
@@ -22,14 +22,12 @@ impl AuditLogWriter {
 
         let active_directory = PathBuf::from(&config.active_directory);
         let journal_directory = PathBuf::from(&config.journal_directory);
-        let archive_directory = PathBuf::from(&config.archive_directory);
+        let primary_directory = PathBuf::from(&config.primary_directory);
 
         // Ensure directories exist
         create_dir_all(&active_directory)?;
         create_dir_all(&journal_directory)?;
-        if config.archive_active {
-            create_dir_all(&archive_directory)?;
-        }
+        create_dir_all(&primary_directory)?;
 
         // Open (or create) the active log file
         let active_path =
@@ -46,18 +44,17 @@ impl AuditLogWriter {
             log_format: config.log_format,
             active_directory,
             journal_directory,
-            archive_directory,
+            primary_directory,
             log_size: config.log_size,
             journal_size: config.journal_size,
-            archive_size: config.archive_size,
-            archive_active: config.archive_active,
+            primary_size: config.primary_size,
             active: AuditActive {
                 file_handle,
                 path: active_path,
                 size: active_size,
             },
             journal: AuditJournal { paths: Vec::new() },
-            archive: AuditArchive { paths: Vec::new() },
+            primary: AuditPrimary { paths: Vec::new() },
         };
         // Immediately check if the log file is too large and create a new one if it is
         // This is needed in the case of a reboot caused by a config log size change
@@ -160,15 +157,11 @@ impl AuditLogWriter {
         // Track journal entry in memory
         self.journal.paths.push(journal_path);
 
-        // Enforce journal size limit
+        // Enforce journal size limit. For now, excess entries are deleted;
+        // a future implementation may move them into primary storage.
         while self.journal.paths.len() > self.journal_size {
             let oldest = self.journal.paths.remove(0);
-            if self.archive_active {
-                // TODO: Move to archive
-                todo!();
-            } else {
-                let _ = std::fs::remove_file(oldest);
-            }
+            let _ = std::fs::remove_file(oldest);
         }
 
         Ok(())
@@ -203,32 +196,29 @@ impl AuditLogWriter {
         let old_format = self.log_format;
         let old_active_dir = self.active_directory.clone();
         let old_journal_dir = self.journal_directory.clone();
-        let old_archive_dir = self.archive_directory.clone();
+        let old_primary_dir = self.primary_directory.clone();
 
         let new_active_dir = PathBuf::from(&cfg.active_directory);
         let new_journal_dir = PathBuf::from(&cfg.journal_directory);
-        let new_archive_dir = PathBuf::from(&cfg.archive_directory);
+        let new_primary_dir = PathBuf::from(&cfg.primary_directory);
         let new_format = cfg.log_format;
 
         // Apply size and toggle changes
         self.log_size = cfg.log_size;
         self.journal_size = cfg.journal_size;
-        self.archive_size = cfg.archive_size;
-        self.archive_active = cfg.archive_active;
+        self.primary_size = cfg.primary_size;
 
         // Ensure the (possibly new) directories exist
         create_dir_all(&new_active_dir)?;
         create_dir_all(&new_journal_dir)?;
-        if self.archive_active {
-            create_dir_all(&new_archive_dir)?;
-        }
+        create_dir_all(&new_primary_dir)?;
 
         let format_changed = new_format != old_format;
         let active_dir_changed = new_active_dir != old_active_dir;
         let journal_dir_changed = new_journal_dir != old_journal_dir;
-        let archive_dir_changed = new_archive_dir != old_archive_dir;
+        let primary_dir_changed = new_primary_dir != old_primary_dir;
 
-        if format_changed || active_dir_changed || journal_dir_changed || archive_dir_changed {
+        if format_changed || active_dir_changed || journal_dir_changed || primary_dir_changed {
             let _ = self.rotate_active_into_journal();
         }
 
@@ -236,7 +226,7 @@ impl AuditLogWriter {
         self.log_format = new_format;
         self.active_directory = new_active_dir;
         self.journal_directory = new_journal_dir;
-        self.archive_directory = new_archive_dir;
+        self.primary_directory = new_primary_dir;
 
         // Reopen active file at new location/extension using updated settings
         self.open_fresh_active_for_current_settings()
