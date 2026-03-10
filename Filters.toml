@@ -15,3 +15,7 @@ record_type = "add_group"
 [[filters]]
 action = "block"
 record_type = "cwd"
+
+[[watches]]
+path = "/etc/passwords"
+action = "report"

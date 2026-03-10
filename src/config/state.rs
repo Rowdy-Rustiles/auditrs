@@ -11,6 +11,8 @@ impl State {
     pub fn load_state() -> Result<State> {
         let config = load_config()?;
         let filters = load_filters()?;
-        Ok(State { config, filters })
+        let watches = load_watches()?;
+        let rules = Rules { filters, watches };
+        Ok(State { config, rules })
     }
 }

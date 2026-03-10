@@ -1,6 +1,6 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
 use crate::config::{
-    ACTIONS, AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, FILTERS_FILE, Filters, State,
+    ACTIONS, AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, Filters, RULES_FILE, State,
 };
 use crate::parser::audit_types::RecordType;
 use crate::utils::current_utc_string;
@@ -28,7 +28,7 @@ impl Filters {
 
     /// Load filters from the dedicated filters file.
     pub fn load() -> Result<Filters> {
-        let file_path = FILTERS_FILE;
+        let file_path = RULES_FILE;
 
         if !Path::new(file_path).exists() {
             // No filters file yet – treat as empty set of filters.
@@ -69,7 +69,7 @@ pub fn load_filters() -> Result<Filters> {
 }
 
 fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
-    let file_path = FILTERS_FILE;
+    let file_path = RULES_FILE;
     fs::create_dir_all(CONFIG_DIR)?;
 
     let array: Vec<toml::Value> = filters
@@ -121,7 +121,7 @@ fn remove_filter(record_type: &str) -> Result<()> {
 
 /// Gets all filters from the filters file using the pre-loaded state.
 pub fn get_filters(state: &State) -> Result<()> {
-    let filters = state.filters.as_slice();
+    let filters = state.rules.filters.as_slice();
     if filters.is_empty() {
         println!("No filters defined");
     } else {
@@ -176,7 +176,7 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
 /// Remove a filter via interactive prompt with fuzzy autocomplete over existing
 /// filters only.
 pub fn remove_filter_interactive(state: &State) -> Result<()> {
-    let existing = state.filters.record_types();
+    let existing = state.rules.filters.record_types();
     if existing.is_empty() {
         return Err(anyhow!("No filters defined; nothing to remove."));
     }
@@ -208,7 +208,7 @@ pub fn remove_filter_interactive(state: &State) -> Result<()> {
 /// Update an existing filter's action via interactive prompt; record type
 /// chosen from current filters only.
 pub fn update_filter_interactive(state: &State) -> Result<()> {
-    let existing = state.filters.record_types();
+    let existing = state.rules.filters.record_types();
     if existing.is_empty() {
         return Err(anyhow!(
             "No filters defined; add a filter first or use 'filter add'."
@@ -456,7 +456,7 @@ pub fn import_filters(file: &str) -> Result<()> {
 }
 
 pub fn dump_filters(file: &str, state: &State) -> Result<()> {
-    let filters = state.filters.as_slice();
+    let filters = state.rules.filters.as_slice();
     if filters.is_empty() {
         return Err(anyhow!("No filters defined; nothing to dump."));
     }
