@@ -19,13 +19,17 @@ pub mod state;
 pub mod watches;
 
 pub use config::{get_config, load_config, set_config};
+// TODO: a lot of the logic between filters and watches is the same, we might
+// want to consider refactoring and consolidating some of their functions.
+// For now, duplication is ok
 pub use filters::{
     AuditFilter, FilterAction, Filters, add_filter_interactive, dump_filters, get_filters,
     import_filters, load_filters, remove_filter_interactive, update_filter_interactive,
 };
 use serde::Deserialize;
 pub use watches::{
-    AuditWatch, WatchAction, Watches, add_watch_interactive, get_watches, load_watches,
+    AuditWatch, WatchAction, Watches, add_watch_interactive, dump_watches, get_watches,
+    import_watches, load_watches, remove_watch_interactive, update_watch_interactive,
 };
 
 /// The minimum log size for the auditrs daemon.

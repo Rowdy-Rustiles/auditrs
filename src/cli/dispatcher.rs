@@ -3,8 +3,9 @@ use clap::ArgMatches;
 
 use crate::config::{
     GetConfigVariables, LogFormat, SetConfigVariables, State, add_filter_interactive,
-    add_watch_interactive, dump_filters, get_config, get_filters, get_watches, import_filters,
-    remove_filter_interactive, set_config, update_filter_interactive,
+    add_watch_interactive, dump_filters, dump_watches, get_config, get_filters, get_watches,
+    import_filters, import_watches, remove_filter_interactive, remove_watch_interactive,
+    set_config, update_filter_interactive, update_watch_interactive,
 };
 use crate::daemon::control::{
     reboot_auditrs, reload_auditrs, start_auditrs, status_auditrs, stop_auditrs,
@@ -145,20 +146,20 @@ fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_watches(state),
         Some(("add", _sub_m)) => add_watch_interactive(state),
-        // Some(("update", _sub_m)) => update_watch_interactive(state),
-        // Some(("remove", _sub_m)) => remove_watch_interactive(state),
-        // Some(("import", sub_m)) => {
-        //     let file = sub_m
-        //         .get_one::<String>("file")
-        //         .context("missing file argument")?;
-        //     import_watches(file)
-        // }
-        // Some(("dump", sub_m)) => {
-        //     let file = sub_m
-        //         .get_one::<String>("file")
-        //         .context("missing file argument")?;
-        //     dump_watches(file, state)
-        // }
+        Some(("update", _sub_m)) => update_watch_interactive(state),
+        Some(("remove", _sub_m)) => remove_watch_interactive(state),
+        Some(("import", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            import_watches(file)
+        }
+        Some(("dump", sub_m)) => {
+            let file = sub_m
+                .get_one::<String>("file")
+                .context("missing file argument")?;
+            dump_watches(file, state)
+        }
         _ => unreachable!("cli implementation should prevent this"),
     }
 }

@@ -3,9 +3,10 @@ mod watches;
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 
-use crate::config::FilterAction;
-
-pub use watches::{add_watch_interactive, get_watches, load_watches};
+pub use watches::{
+    add_watch_interactive, dump_watches, get_watches, import_watches, load_watches,
+    remove_watch_interactive, update_watch_interactive,
+};
 
 /// The set of actions that can be taken by filters.
 #[derive(
