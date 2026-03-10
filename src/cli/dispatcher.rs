@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use clap::ArgMatches;
 
 use crate::config::{
-    GetConfigVariables, LogFormat, SetConfigVariables, State, add_filter_interactive, dump_filters,
-    get_config, get_filters, import_filters, remove_filter_interactive, set_config,
-    update_filter_interactive,
+    GetConfigVariables, LogFormat, SetConfigVariables, State, add_filter_interactive,
+    add_watch_interactive, dump_filters, get_config, get_filters, get_watches, import_filters,
+    remove_filter_interactive, set_config, update_filter_interactive,
 };
 use crate::daemon::control::{
     reboot_auditrs, reload_auditrs, start_auditrs, status_auditrs, stop_auditrs,
@@ -23,6 +23,7 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
         Some(("report", sub_m)) => handle_report(sub_m)?,
         Some(("config", sub_m)) => handle_config(sub_m)?,
         Some(("filter", sub_m)) => handle_filter(sub_m, &state)?,
+        Some(("watch", sub_m)) => handle_watch(sub_m, &state)?,
         None => {
             unreachable!("cli implementation should prevent this");
         }
@@ -136,6 +137,28 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
                 .context("missing file argument")?;
             dump_filters(file, state)
         }
+        _ => unreachable!("cli implementation should prevent this"),
+    }
+}
+
+fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
+    match matches.subcommand() {
+        Some(("get", _sub_m)) => get_watches(state),
+        Some(("add", _sub_m)) => add_watch_interactive(state),
+        // Some(("update", _sub_m)) => update_watch_interactive(state),
+        // Some(("remove", _sub_m)) => remove_watch_interactive(state),
+        // Some(("import", sub_m)) => {
+        //     let file = sub_m
+        //         .get_one::<String>("file")
+        //         .context("missing file argument")?;
+        //     import_watches(file)
+        // }
+        // Some(("dump", sub_m)) => {
+        //     let file = sub_m
+        //         .get_one::<String>("file")
+        //         .context("missing file argument")?;
+        //     dump_watches(file, state)
+        // }
         _ => unreachable!("cli implementation should prevent this"),
     }
 }

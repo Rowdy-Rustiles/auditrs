@@ -1,6 +1,6 @@
 use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
 use crate::config::{
-    FilterAction, AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, Filters, RULES_FILE, State,
+    AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, FilterAction, Filters, RULES_FILE, State,
 };
 use crate::parser::audit_types::RecordType;
 use crate::utils::{current_utc_string, strip_block_comments};
@@ -168,11 +168,14 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
         return Err(anyhow!("record type cannot be empty"));
     }
 
-    let actions: Vec<String> = FilterAction::iter().map(|a| a.as_ref().to_string()).collect();
+    let actions: Vec<String> = FilterAction::iter()
+        .map(|a| a.as_ref().to_string())
+        .collect();
     let action_str = Select::new("Select an action for this record type", actions)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?;
-    let action = FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
+    let action =
+        FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
 
     let filter = AuditFilter {
         record_type,
@@ -244,11 +247,14 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         .to_string()
         .to_lowercase();
 
-    let actions: Vec<String> = FilterAction::iter().map(|a| a.as_ref().to_string()).collect();
+    let actions: Vec<String> = FilterAction::iter()
+        .map(|a| a.as_ref().to_string())
+        .collect();
     let action_str = Select::new("Select new action for this record type", actions)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?;
-    let action = FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
+    let action =
+        FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
 
     let filter = AuditFilter {
         record_type,

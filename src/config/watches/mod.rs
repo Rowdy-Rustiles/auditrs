@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::config::FilterAction;
 
-pub use watches::load_watches;
+pub use watches::{add_watch_interactive, get_watches, load_watches};
 
 /// The set of actions that can be taken by filters.
 #[derive(

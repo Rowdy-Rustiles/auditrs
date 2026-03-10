@@ -20,11 +20,13 @@ pub mod watches;
 
 pub use config::{get_config, load_config, set_config};
 pub use filters::{
-    FilterAction, AuditFilter, Filters, add_filter_interactive, dump_filters, get_filters,
+    AuditFilter, FilterAction, Filters, add_filter_interactive, dump_filters, get_filters,
     import_filters, load_filters, remove_filter_interactive, update_filter_interactive,
 };
 use serde::Deserialize;
-pub use watches::{WatchAction, AuditWatch, Watches, load_watches,};
+pub use watches::{
+    AuditWatch, WatchAction, Watches, add_watch_interactive, get_watches, load_watches,
+};
 
 /// The minimum log size for the auditrs daemon.
 pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
@@ -41,7 +43,16 @@ pub const RULES_FILE: &str = "/etc/auditrs/rules.toml";
 /// The file extensions that can be used for importing and dumping filters.
 pub const FILTER_FILE_EXTENSIONS: &[&str] = &["toml", "ars"];
 /// The actions available for filters and watches.
-pub const FILTER_ACTIONS: &[&str] = &["allow", "block", "sample", "redact", "route_secondary", "tag", "count_only", "alert"];
+pub const FILTER_ACTIONS: &[&str] = &[
+    "allow",
+    "block",
+    "sample",
+    "redact",
+    "route_secondary",
+    "tag",
+    "count_only",
+    "alert",
+];
 /// The log formats for the auditrs output logs.
 pub const LOG_FORMATS: &[&str] = &["Legacy", "Simple", "Json"];
 /// The default configuration for the auditrs daemon.

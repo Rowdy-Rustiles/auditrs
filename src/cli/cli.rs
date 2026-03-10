@@ -10,6 +10,7 @@ pub fn build_cli() -> ClapCommand {
         .subcommand(ClapCommand::new("reboot").about("Restart the auditrs daemon (stop + start)"))
         .subcommand(ClapCommand::new("status").about("Show whether the daemon is running"))
         .subcommand(build_filter())
+        .subcommand(build_watch())
         .subcommand(build_dump())
         .subcommand(build_search())
         .subcommand(build_report())
@@ -280,6 +281,45 @@ fn build_filter() -> ClapCommand {
         .subcommand(
             ClapCommand::new("dump")
                 .about("Dump filters to a file (supports .ars, .toml)")
+                .arg(Arg::new("file").value_name("FILE").required(true).help(
+                    "File to dump filters to (omit file extension)"
+                )),
+        )
+        .arg_required_else_help(true)
+}
+
+fn build_watch() -> ClapCommand {
+    ClapCommand::new("watch")
+        .about("Commands for managing log watches")
+        .long_about("Commands for managing log watches\nDocumentation about watches can be\nfound at: TO IMPLEMENT")
+        .subcommand(
+            ClapCommand::new("get").about("Show current watches").arg(
+                Arg::new("value")
+                    .value_name("VALUE")
+                    .required(false)
+                    .help("Optional single value to filter by"),
+            ),
+        )
+        .subcommand(ClapCommand::new("add")
+        .about("Add a watch rule")
+        .long_about("Add a watch rule for as specified in:\nTO IMPLEMENT"))
+        .subcommand(
+            ClapCommand::new("remove")
+                .about("Remove a watch rule")
+                .arg(Arg::new("value").value_name("VALUE").required(false).help(
+                    "Path to remove; omit for interactive choice from existing watches",
+                )),
+        )
+        .subcommand(
+            ClapCommand::new("import")
+                .about("Import watches from a file (supports .ars, .toml)")
+                .arg(Arg::new("file").value_name("FILE").required(true).help(
+                    "File to import filters from (.ars, .toml, .rules)",
+                )),
+        )
+        .subcommand(
+            ClapCommand::new("dump")
+                .about("Dump watches to a file (supports .ars, .toml)")
                 .arg(Arg::new("file").value_name("FILE").required(true).help(
                     "File to dump filters to (omit file extension)"
                 )),
