@@ -56,11 +56,10 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
                 Some("format") => Some(GetConfigVariables::LogFormat),
                 Some("log-directory") => Some(GetConfigVariables::LogDirectory),
                 Some("journal-directory") => Some(GetConfigVariables::JournalDirectory),
-                Some("archive-directory") => Some(GetConfigVariables::ArchiveDirectory),
+                Some("primary-directory") => Some(GetConfigVariables::PrimaryDirectory),
                 Some("log-size") => Some(GetConfigVariables::LogSize),
                 Some("journal-size") => Some(GetConfigVariables::JournalSize),
-                Some("archive-size") => Some(GetConfigVariables::ArchiveSize),
-                Some("archive-active") => Some(GetConfigVariables::ArchiveActive),
+                Some("primary-size") => Some(GetConfigVariables::PrimarySize),
                 _ => None,
             };
             get_config(key).map_err(|e| anyhow::anyhow!("{}", e))
@@ -91,12 +90,12 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
             set_config(SetConfigVariables::JournalDirectory { value })
                 .map_err(|e| anyhow::anyhow!("{}", e))
         }
-        Some(("archive-directory", m)) => {
+        Some(("primary-directory", m)) => {
             let value = m
                 .get_one::<String>("value")
                 .context("missing value")?
                 .clone();
-            set_config(SetConfigVariables::ArchiveDirectory { value })
+            set_config(SetConfigVariables::PrimaryDirectory { value })
                 .map_err(|e| anyhow::anyhow!("{}", e))
         }
         Some(("log-size", _m)) => {
@@ -105,11 +104,8 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
         Some(("journal-size", _m)) => {
             set_config(SetConfigVariables::JournalSize).map_err(|e| anyhow::anyhow!("{}", e))
         }
-        Some(("archive-size", _m)) => {
-            set_config(SetConfigVariables::ArchiveSize).map_err(|e| anyhow::anyhow!("{}", e))
-        }
-        Some(("archive-active", _m)) => {
-            set_config(SetConfigVariables::ArchiveActive).map_err(|e| anyhow::anyhow!("{}", e))
+        Some(("primary-size", _m)) => {
+            set_config(SetConfigVariables::PrimarySize).map_err(|e| anyhow::anyhow!("{}", e))
         }
         _ => Ok(()),
     };
