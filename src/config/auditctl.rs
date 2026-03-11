@@ -59,11 +59,7 @@ fn watch_to_auditctl_format(watch: &AuditWatch, delete: bool) -> String {
     let add_or_delete_str = if delete { "-d" } else { "-a" };
     format!(
         "{} always,exit -F {}{} -F perm={} -k {}",
-        add_or_delete_str,
-        recursive_str,
-        path_str,
-        perms,
-        watch.key
+        add_or_delete_str, recursive_str, path_str, perms, watch.key
     )
 }
 
