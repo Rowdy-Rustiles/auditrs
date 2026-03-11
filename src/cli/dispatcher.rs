@@ -1,3 +1,8 @@
+//! CLI dispatcher module for routing subcommands to their respective handlers.
+//!
+//! This module contains the top-level `dispatch` function that matches CLI
+//! subcommands and delegates to handler functions.
+
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 
@@ -42,12 +47,10 @@ fn handle_dump(_matches: &ArgMatches) -> Result<()> {
 
 fn handle_search(_matches: &ArgMatches) -> Result<()> {
     todo!()
-
 }
 
 fn handle_report(_matches: &ArgMatches) -> Result<()> {
     todo!()
-
 }
 
 fn handle_config(matches: &ArgMatches) -> Result<()> {
@@ -122,14 +125,36 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
 fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_filters(state),
-        Some(("add", _sub_m)) => add_filter_interactive(state),
-        Some(("update", _sub_m)) => update_filter_interactive(state),
-        Some(("remove", _sub_m)) => remove_filter_interactive(state),
+        Some(("add", _sub_m)) => {
+            let result = add_filter_interactive(state);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
+        }
+        Some(("update", _sub_m)) => {
+            let result = update_filter_interactive(state);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
+        }
+        Some(("remove", _sub_m)) => {
+            let result = remove_filter_interactive(state);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
+        }
         Some(("import", sub_m)) => {
             let file = sub_m
                 .get_one::<String>("file")
                 .context("missing file argument")?;
-            import_filters(file)
+            let result = import_filters(file);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
         }
         Some(("dump", sub_m)) => {
             let file = sub_m
@@ -144,14 +169,36 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
 fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_watches(state),
-        Some(("add", _sub_m)) => add_watch_interactive(state),
-        Some(("update", _sub_m)) => update_watch_interactive(state),
-        Some(("remove", _sub_m)) => remove_watch_interactive(state),
+        Some(("add", _sub_m)) => {
+            let result = add_watch_interactive();
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
+        }
+        Some(("update", _sub_m)) => {
+            let result = update_watch_interactive(state);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
+        }
+        Some(("remove", _sub_m)) => {
+            let result = remove_watch_interactive(state);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
+        }
         Some(("import", sub_m)) => {
             let file = sub_m
                 .get_one::<String>("file")
                 .context("missing file argument")?;
-            import_watches(file)
+            let result = import_watches(file);
+            if result.is_ok() {
+                reload_auditrs()?;
+            }
+            result
         }
         Some(("dump", sub_m)) => {
             let file = sub_m

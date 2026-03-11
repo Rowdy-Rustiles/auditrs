@@ -1,7 +1,7 @@
 //! Top-level functions for controlling the state of the auditrs daemon.
 
 use super::daemon::{is_running, read_pid, start_daemon, stop_daemon};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use colorized::*;
 use std::fs;
 use std::path::PathBuf;
@@ -13,7 +13,8 @@ pub fn start_auditrs(reboot: bool) -> Result<()> {
         return Ok(());
     }
     println!("Starting auditrs...");
-    start_daemon()?;
+    start_daemon()
+    .context("Failed to start daemon")?;
     if !reboot {
         colorize_println("Auditrs started successfully", Colors::BrightGreenFg);
     }

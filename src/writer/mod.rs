@@ -2,7 +2,7 @@
 
 mod writer;
 
-use crate::config::LogFormat;
+use crate::config::{LogFormat, State};
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -16,16 +16,28 @@ const DEFAULT_LOG_SIZE: usize = 6 * 1024 * 1024; // 6 MB
 /// primary store. The audit log writer is responsible for managing log
 /// rotations, enforcing log size limits, and handling long term log storage.
 pub struct AuditLogWriter {
+    /// The log format to use for the active log.
     log_format: LogFormat,
+    /// The directory to write the active log to.
     active_directory: PathBuf,
+    /// The directory to write the journal to.
     journal_directory: PathBuf,
+    /// The directory to write the primary log to.
     primary_directory: PathBuf,
-    log_size: usize,     // size of active log in bytes
-    journal_size: usize, // number of logs to keep in journal
-    primary_size: usize, // number of logs to keep in primary store
+    /// The size of the active log in bytes.
+    log_size: usize,
+    /// The size of the journal in bytes.
+    journal_size: usize,
+    /// The size of the primary log in bytes.
+    primary_size: usize,
+    /// The active log.
     active: AuditActive,
+    /// The journal.
     journal: AuditJournal,
+    /// The primary log.
     primary: AuditPrimary,
+    /// The state of the auditrs configuration.
+    state: State,
 }
 
 /// Represents the active log immediately written to by the daemon.
@@ -53,6 +65,3 @@ pub struct AuditJournal {
 pub struct AuditPrimary {
     paths: Vec<PathBuf>,
 }
-
-// TODO: Implement
-pub struct PrimaryConfig {}

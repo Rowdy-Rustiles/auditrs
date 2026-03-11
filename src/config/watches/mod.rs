@@ -1,5 +1,7 @@
 mod watches;
 
+use std::path::PathBuf;
+
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 
@@ -22,10 +24,12 @@ pub use watches::{
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum WatchAction {
-    /// Report matching records to the primary log.
-    Report,
-    /// Do not write matching records to the primary log.
-    Block,
+    /// Watch for reads to the specified path.
+    Read,
+    /// Watch for writes to the specified path.
+    Write,
+    /// Watch for executions on the specified path.
+    Execute,
 }
 
 /// Watches are fine-grained, directory and file-based rules that specify which
@@ -36,12 +40,14 @@ pub enum WatchAction {
 pub struct Watches(pub(crate) Vec<AuditWatch>);
 
 /// The internal auditrs representation of a single watch, which is a system
-/// path coupled with the action to be taken on it.
+/// path coupled with the actions to be taken on it.
 #[derive(Debug, Deserialize)]
 pub struct AuditWatch {
-    pub path: String,
-    pub action: WatchAction,
+    pub path: PathBuf,
+    pub actions: Vec<WatchAction>,
     pub recursive: bool,
+    #[serde(default)]
+    pub key: String,
     // pub duration: Option<Duration>,
     // pub from: Option<DateTime<Utc>>,
     // pub to: Option<DateTime<Utc>>,

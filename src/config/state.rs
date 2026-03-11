@@ -1,3 +1,6 @@
+//! Module implementing the State struct. Specifically provides the state
+//! loading function.
+
 use crate::config::*;
 use anyhow::Result;
 

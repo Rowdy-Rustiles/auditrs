@@ -1,7 +1,6 @@
-/*
-This is a simple binary that captures audit messages and logs them to files in various stages of processing.
-The output settings can be configured in the OutputSettings struct, which controls what gets logged and where.
-*/
+//! This is a simple binary that captures audit messages and logs them to files
+//! in various stages of processing. The output settings can be configured in
+//! the OutputSettings struct, which controls what gets logged and where.
 use anyhow::{Context, Result};
 use audit::new_connection;
 use audit::packet::AuditMessage;
