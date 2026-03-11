@@ -1,5 +1,7 @@
 //! Module defining functions that execute the auditctl commands that auditrs
-//! wraps.
+//! wraps. For features like watches, it is not enough to look for commands
+//! affecting given paths, we need to tell Linux Audit Subsystem to send us
+//! events related to actions taken on those paths.
 //!
 //! This module is the single place where we construct and invoke `auditctl`
 //! commands, so higher-level config code can stay focused on concepts
@@ -9,6 +11,10 @@ use anyhow::Result;
 use std::process::Command;
 
 use crate::config::{AuditWatch, WatchAction};
+
+// TODO: to persist the auditctl rules between reboots, we need to add them to
+// /etc/audit/audit.rules, this should be done at the same time as the watches
+// are added to /etc/auditrs/rules.toml and auditctl.
 
 /// Execute a raw `auditctl` command string.
 ///

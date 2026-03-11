@@ -55,6 +55,7 @@ impl AuditLogWriter {
             },
             journal: AuditJournal { paths: Vec::new() },
             primary: AuditPrimary { paths: Vec::new() },
+            state: state,
         };
         // Immediately check if the log file is too large and create a new one if it is
         // This is needed in the case of a reboot caused by a config log size change
@@ -63,10 +64,11 @@ impl AuditLogWriter {
     }
 
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
+        let write_primary = self.check_watch_events(&event);
         match self.log_format {
-            LogFormat::Legacy => self.write_event_legacy(event)?,
-            LogFormat::Simple => self.write_event_simple(event)?,
-            LogFormat::Json => self.write_event_json(event)?,
+            LogFormat::Legacy => self.write_event_legacy(event, write_primary)?,
+            LogFormat::Simple => self.write_event_simple(event, write_primary)?,
+            LogFormat::Json => self.write_event_json(event, write_primary)?,
         }
         // TODO: We should be checking to see if writing an event would exceed the log
         // size limit. if so, log rotation should be triggered then rather than
@@ -74,7 +76,7 @@ impl AuditLogWriter {
         self.check_log_size()
     }
 
-    fn write_event_legacy(&mut self, event: AuditEvent) -> Result<()> {
+    fn write_event_legacy(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
         let mut prefix: String = String::new();
         let mut fields: String = String::new();
         for record in event.records {
@@ -88,20 +90,32 @@ impl AuditLogWriter {
                 fields.push_str(&format!(" {}={}", field.0, field.1));
             }
         }
-        let line = format!("{}{}", prefix, fields);
+        let event_str = format!("{}{}", prefix, fields);
 
-        writeln!(self.active.file_handle, "{}", line)?;
+        writeln!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
+
+        if write_primary {
+            self.write_primary(event_str)?;
+        }
+
         Ok(())
     }
 
-    fn write_event_simple(&mut self, event: AuditEvent) -> Result<()> {
-        writeln!(self.active.file_handle, "{}", event)?;
+    fn write_event_simple(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
+        let event_str = format!("{}", event);
+        writeln!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
+
+
+        if write_primary {
+            self.write_primary(event_str)?;
+        }
+
         Ok(())
     }
 
-    fn write_event_json(&mut self, event: AuditEvent) -> Result<()> {
+    fn write_event_json(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
         todo!();
         let timestamp = format!(
             "\"timestamp\": \"{}\"",
@@ -111,7 +125,49 @@ impl AuditLogWriter {
 
         let res = format!("");
         writeln!(self.active.file_handle, "{}", res)?;
+
+        if write_primary {
+            self.write_primary(res)?;
+        }
+
         Ok(())
+    }
+    fn write_primary(&mut self, line: String) -> Result<()> {
+        // Get the latest primary log path, creating one if it doesn't exist yet.
+        let path: PathBuf = if let Some(last) = self.primary.paths.last() {
+            last.clone()
+        } else {
+            let new_path = self.primary_directory.join(format!(
+                "auditrs_primary_{}.{}",
+                current_utc_string(),
+                self.log_format.get_extension()
+            ));
+            self.primary.paths.push(new_path.clone());
+            new_path
+        };
+
+        let mut file_handle = OpenOptions::new().create(true).append(true).open(&path)?;
+        writeln!(file_handle, "{}", line)?;
+        file_handle.flush()?;
+        Ok(())
+    }
+
+    /// Check if the audit event contains a record with a key identifier that
+    /// matches a configured watch.
+    fn check_watch_events(&self, event: &AuditEvent) -> bool {
+        let watches = &self.state.rules.watches.0;
+
+        // Return true if any record in this event has a `key` field that matches
+        // the `key` of any configured watch.
+        for record in &event.records {
+            if let Some(record_key) = record.fields.get("key") {
+                if watches.iter().any(|watch| &watch.key == record_key) {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     fn active_log_path(&self) -> PathBuf {
