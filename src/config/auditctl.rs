@@ -43,13 +43,25 @@ fn watch_to_auditctl_format(watch: &AuditWatch, delete: bool) -> String {
 
     // Using the auditctl cli tool, the dir argument automatically enables recursive
     // watching, the path argument does not allow recursive watching.
-    let recursive_str = if watch.recursive { "dir=" } else { "path=" };
+    let mut recursive_str = String::new();
+    let mut path_str = String::from(watch.path.to_string_lossy());
+    if watch.recursive {
+        recursive_str = "dir=".to_string();
+        if !path_str.ends_with('/') {
+            path_str.push('/');
+        }
+    } else {
+        recursive_str = "path=".to_string();
+        if path_str.ends_with('/') {
+            path_str.pop();
+        }
+    }
     let add_or_delete_str = if delete { "-d" } else { "-a" };
     format!(
         "{} always,exit -F {}{} -F perm={} -k {}",
         add_or_delete_str,
         recursive_str,
-        watch.path.to_string_lossy(),
+        path_str,
         perms,
         watch.key
     )
