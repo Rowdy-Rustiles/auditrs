@@ -1,22 +1,30 @@
 use crate::config::input_utils::{FilePathCompleter, StringListAutoCompleter};
 use crate::config::{
     AuditWatch, CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE, State, WatchAction, Watches,
+    execute_watch_auditctl_command,
 };
 use crate::utils::{current_utc_string, strip_block_comments};
 use anyhow::{Context, Result, anyhow};
-use inquire::Select;
 use inquire::{Confirm, formatter::StringFormatter, validator::Validation};
+use inquire::{MultiSelect, Select};
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf, absolute};
 use std::str::FromStr;
+use strum::EnumString;
 use strum::IntoEnumIterator;
+use tokio::sync::watch;
 use toml;
 
 impl Watches {
     /// Returns the list of watched paths currently defined.
     pub fn paths(&self) -> Vec<String> {
-        self.0.iter().map(|w| w.path.clone()).collect()
+        self.0
+            .iter()
+            .map(|w| w.path.to_string_lossy().into_owned())
+            .collect()
     }
 
     /// Returns the underlying watch list.
@@ -53,22 +61,37 @@ impl Watches {
                     .filter_map(|v| v.as_table())
                     .filter_map(|table| {
                         let path = table.get("path")?.as_str()?.to_string();
-                        let action_str = table.get("action")?.as_str()?.to_string();
-                        let action = WatchAction::from_str(&action_str.to_lowercase()).ok()?;
+
+                        let actions: Vec<WatchAction> =
+                            table.get("actions").and_then(|v| v.as_array()).map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str())
+                                    .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
+                                    .collect::<Vec<_>>()
+                            })?;
+
+                        if actions.is_empty() {
+                            return None;
+                        }
+
+                        let recursive = table.get("recursive").and_then(|v| v.as_bool())?;
+
+                        let path_buf = PathBuf::from(&path);
+                        let key = table
+                            .get("key")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())?;
+
                         Some(AuditWatch {
-                            path,
-                            action,
-                            // Default values for optional fields that may not be present in the
-                            // rules file yet.
-                            recursive: false,
-                            // duration: None,
-                            // from: None,
-                            // to: None,
+                            path: path_buf,
+                            actions,
+                            recursive,
+                            key,
                         })
                     })
                     .collect()
             })
-            .unwrap_or_else(Vec::new);
+            .ok_or_else(|| anyhow!("Failed to parse watches"))?;
 
         Ok(Watches(watches_vec))
     }
@@ -77,6 +100,19 @@ impl Watches {
 /// Function used by the shared state loader.
 pub fn load_watches() -> Result<Watches> {
     Watches::load()
+}
+
+/// Generatess a unique key for the watch rule. Used for identifying rules when
+/// they are deleted
+fn generate_watch_key(path: &Path, actions: &[WatchAction], recursive: bool) -> String {
+    let mut hasher = DefaultHasher::new();
+    path.to_string_lossy().to_lowercase().hash(&mut hasher);
+    for action in actions {
+        action.as_ref().hash(&mut hasher);
+    }
+    recursive.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("auditrs_watch_{:016x}", hash)
 }
 
 fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
@@ -99,11 +135,21 @@ fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
         .iter()
         .map(|f| {
             let mut table = toml::map::Map::new();
-            table.insert("path".into(), toml::Value::String(f.path.clone()));
             table.insert(
-                "action".into(),
-                toml::Value::String(f.action.as_ref().to_string()),
+                "path".into(),
+                toml::Value::String(f.path.to_string_lossy().into_owned()),
             );
+            table.insert(
+                "actions".into(),
+                toml::Value::Array(
+                    f.actions
+                        .iter()
+                        .map(|a| toml::Value::String(a.as_ref().to_string()))
+                        .collect(),
+                ),
+            );
+            table.insert("recursive".into(), toml::Value::Boolean(f.recursive));
+            table.insert("key".into(), toml::Value::String(f.key.clone()));
             toml::Value::Table(table)
         })
         .collect();
@@ -132,7 +178,7 @@ fn set_watch(watch: AuditWatch) -> Result<()> {
 
 /// Add a single watch via interactive prompts.
 pub fn add_watch_interactive(_state: &State) -> Result<()> {
-    let watch_path = inquire::Text::new("Enter a record type to filter on:")
+    let mut watch_path_str = inquire::Text::new("Enter a file or directory path to watch:")
         .with_autocomplete(FilePathCompleter::default())
         .with_validator(|input: &str| {
             if Path::new(input).exists() {
@@ -151,28 +197,52 @@ pub fn add_watch_interactive(_state: &State) -> Result<()> {
         .to_string()
         .to_lowercase();
 
-    if watch_path.is_empty() {
+    if watch_path_str.is_empty() {
         return Err(anyhow!("record type cannot be empty"));
     }
 
     let actions: Vec<String> = WatchAction::iter()
         .map(|a| a.as_ref().to_string())
         .collect();
-    let action_str = Select::new("Select an action for this watch", actions)
+    let action_str = MultiSelect::new("Select the actions to watch for", actions)
+        .with_validator(|input: &[inquire::list_option::ListOption<&String>]| {
+            if input.is_empty() {
+                Ok(Validation::Invalid(
+                    "Please select at least one action".into(),
+                ))
+            } else {
+                Ok(Validation::Valid)
+            }
+        })
         .prompt()
         .map_err(|e| anyhow!("{}", e))?;
-    let action = WatchAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
+    let actions = action_str
+        .iter()
+        .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(|e| anyhow!("{}", e)))
+        .collect::<Result<Vec<_>>>()?;
 
-    let recursive = Confirm::new("Watch recursively?")
-        .with_default(true)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?;
+    // We only prompt for recursive if the path is a directory
+    let mut recursive = false;
+    if Path::new(&watch_path_str).is_dir() {
+        recursive = Confirm::new("Watch recursively?")
+            .with_default(true)
+            .prompt()
+            .map_err(|e| anyhow!("{}", e))?;
+    }
+
+    // Derive the absolute path
+    let watch_path = absolute(watch_path_str)?;
+    let key = generate_watch_key(&watch_path, &actions, recursive);
 
     let watch = AuditWatch {
         path: watch_path,
-        action,
+        actions,
         recursive,
+        key,
     };
+    // Create the watch in the Linux audit system
+    execute_watch_auditctl_command(&watch, false)?;
+    // Then persist the watch to the auditrs rules file
     set_watch(watch)
 }
 
@@ -185,10 +255,16 @@ pub fn get_watches(state: &State) -> Result<()> {
         println!("Watches:");
         for watch in watches {
             let recursive_str = if watch.recursive { "Yes" } else { "No" };
+            let actions_str = watch
+                .actions
+                .iter()
+                .map(|a| a.as_ref())
+                .collect::<Vec<_>>()
+                .join(", ");
             println!(
-                "    {}: \n\tAction: {} \n\tRecursive?: {}",
-                watch.path,
-                watch.action.as_ref(),
+                "    {}: \n\tActions: {} \n\tRecursive?: {}",
+                watch.path.to_string_lossy().into_owned(),
+                actions_str,
                 recursive_str
             );
         }
@@ -198,7 +274,9 @@ pub fn get_watches(state: &State) -> Result<()> {
 
 fn remove_watch(path: &str) -> Result<()> {
     let mut current = load_watches()?;
-    current.0.retain(|w| !w.path.eq_ignore_ascii_case(path));
+    current
+        .0
+        .retain(|w| !w.path.to_string_lossy().eq_ignore_ascii_case(path));
     persist_watches(&current.0)
 }
 
@@ -230,6 +308,18 @@ pub fn remove_watch_interactive(state: &State) -> Result<()> {
         .to_string()
         .to_lowercase();
 
+    // This should always be Some because of the validator above
+    let watch_to_remove = state
+        .rules
+        .watches
+        .as_slice()
+        .iter()
+        .find(|w| w.path.to_string_lossy().eq_ignore_ascii_case(&watch_path));
+    if let Some(watch) = watch_to_remove {
+        execute_watch_auditctl_command(watch, true)?;
+    } else {
+        unreachable!("Validator should be preventing this state")
+    }
     remove_watch(&watch_path)
 }
 
@@ -266,52 +356,55 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
     let actions: Vec<String> = WatchAction::iter()
         .map(|a| a.as_ref().to_string())
         .collect();
-    let action_str = Select::new("Select new action for this watch", actions)
+    let action_str = MultiSelect::new("Select new actions for this watch", actions)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?;
-    let action = WatchAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
+    let actions = action_str
+        .iter()
+        .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(|e| anyhow!("{}", e)))
+        .collect::<Result<Vec<_>>>()?;
 
     let recursive = Confirm::new("Watch recursively?")
         .with_default(true)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?;
 
+    let watch_actions = actions.clone();
+    let path_buf = PathBuf::from(watch_path.clone());
+    let key = generate_watch_key(&path_buf, &watch_actions, recursive);
+
     let watch = AuditWatch {
-        path: watch_path,
-        action,
+        path: path_buf,
+        actions: watch_actions,
         recursive,
+        key,
     };
     set_watch(watch)
 }
 
 fn validate_and_build_watch(
     path: &str,
-    action: &str,
+    actions: Vec<WatchAction>,
     recursive: bool,
     location: &str,
 ) -> Result<AuditWatch> {
     let path = path.trim();
-    let action = action.trim();
 
     if path.is_empty() {
         return Err(anyhow!("{}: path is empty", location));
     }
-    if action.is_empty() {
-        return Err(anyhow!("{}: action is empty", location));
+    if actions.is_empty() {
+        return Err(anyhow!("{}: actions is empty", location));
     }
 
-    let parsed_action = WatchAction::from_str(&action.to_lowercase()).map_err(|_| {
-        anyhow!(
-            "{}: invalid action '{}' (expected one of: report, block)",
-            location,
-            action
-        )
-    })?;
+    let path_buf = PathBuf::from(path.to_lowercase());
+    let key = generate_watch_key(&path_buf, &actions, recursive);
 
     Ok(AuditWatch {
-        path: path.to_lowercase(),
-        action: parsed_action,
-        recursive: recursive,
+        path: path_buf,
+        actions,
+        recursive,
+        key,
     })
 }
 
@@ -353,16 +446,25 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
             }
         };
 
-        let action = match table.get("action").and_then(|v| v.as_str()) {
-            Some(s) => s,
+        let actions: Vec<WatchAction> = match table.get("actions").and_then(|v| v.as_array()) {
+            Some(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_str())
+                .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
+                .collect(),
             None => {
                 eprintln!(
-                    "warning: {}: missing or non-string 'action' field, skipping",
+                    "warning: {}: missing 'actions' array field, skipping",
                     location
                 );
                 continue;
             }
         };
+
+        if actions.is_empty() {
+            eprintln!("warning: {}: empty actions list, skipping", location);
+            continue;
+        }
 
         let recursive = match table.get("recursive").and_then(|v| v.as_bool()) {
             Some(b) => b,
@@ -375,7 +477,7 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
             }
         };
 
-        match validate_and_build_watch(watch_path, action, recursive, &location) {
+        match validate_and_build_watch(watch_path, actions, recursive, &location) {
             Ok(w) => watches.push(w),
             Err(e) => eprintln!("warning: {}, skipping", e),
         }
@@ -412,7 +514,7 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
             }
         };
 
-        let (action, recursive) = match options.split_once(',') {
+        let (actions_raw, recursive) = match options.split_once(',') {
             Some(pair) => pair,
             None => {
                 eprintln!(
@@ -423,7 +525,15 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
             }
         };
 
-        match validate_and_build_watch(watch_path, action, recursive.parse::<bool>()?, &location) {
+        let actions: Vec<WatchAction> = actions_raw
+            .split('|')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| WatchAction::from_str(&s.to_lowercase()))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| anyhow!("{}: invalid action list '{}'", location, actions_raw))?;
+
+        match validate_and_build_watch(watch_path, actions, recursive.parse::<bool>()?, &location) {
             Ok(w) => watches.push(w),
             Err(e) => eprintln!("warning: {}, skipping", e),
         }
@@ -442,7 +552,10 @@ pub fn import_watches(file: &str) -> Result<()> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read '{}'", path.display()))?;
 
-    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .ok_or_else(|| anyhow!("Failed to get file extension"))?;
 
     let watches = match extension {
         "toml" => import_from_toml(&content, path)?,
@@ -523,12 +636,21 @@ fn to_toml_format(watches: &[AuditWatch]) -> Result<String> {
                 .iter()
                 .map(|w| {
                     let mut watch_table = toml::map::Map::new();
-                    watch_table.insert("path".into(), toml::Value::String(w.path.clone()));
                     watch_table.insert(
-                        "action".into(),
-                        toml::Value::String(w.action.as_ref().to_string()),
+                        "path".into(),
+                        toml::Value::String(w.path.to_string_lossy().into_owned()),
+                    );
+                    watch_table.insert(
+                        "actions".into(),
+                        toml::Value::Array(
+                            w.actions
+                                .iter()
+                                .map(|a| toml::Value::String(a.as_ref().to_string()))
+                                .collect(),
+                        ),
                     );
                     watch_table.insert("recursive".into(), toml::Value::Boolean(w.recursive));
+                    watch_table.insert("key".into(), toml::Value::String(w.key.clone()));
                     toml::Value::Table(watch_table)
                 })
                 .collect(),
@@ -540,10 +662,16 @@ fn to_toml_format(watches: &[AuditWatch]) -> Result<String> {
 fn to_ars_format(watches: &[AuditWatch]) -> Result<String> {
     let mut content = String::new();
     for watch in watches {
+        let actions_str = watch
+            .actions
+            .iter()
+            .map(|a| a.as_ref())
+            .collect::<Vec<_>>()
+            .join("|");
         content.push_str(&format!(
             "{}: {}, {}\n",
-            watch.path,
-            watch.action.as_ref(),
+            watch.path.display(),
+            actions_str,
             watch.recursive.to_string().to_lowercase()
         ));
     }

@@ -12,6 +12,7 @@
 //! configuration occurs via the `auditrs config` command, which is tied to
 //! logic in the top-level files within `config/`.
 
+pub mod auditctl;
 pub mod config;
 pub mod filters;
 pub mod input_utils;
@@ -22,6 +23,7 @@ pub use config::{get_config, load_config, set_config};
 // TODO: a lot of the logic between filters and watches is the same, we might
 // want to consider refactoring and consolidating some of their functions.
 // For now, duplication is ok
+pub use auditctl::{execute_auditctl_command, execute_watch_auditctl_command};
 pub use filters::{
     AuditFilter, FilterAction, Filters, add_filter_interactive, dump_filters, get_filters,
     import_filters, load_filters, remove_filter_interactive, update_filter_interactive,

@@ -1,7 +1,7 @@
 //! CLI dispatcher module for routing subcommands to their respective handlers.
 //!
-//! This module contains the top-level `dispatch` function that matches CLI subcommands
-//! and delegates to handler functions.
+//! This module contains the top-level `dispatch` function that matches CLI
+//! subcommands and delegates to handler functions.
 
 use anyhow::{Context, Result};
 use clap::ArgMatches;
@@ -47,12 +47,10 @@ fn handle_dump(_matches: &ArgMatches) -> Result<()> {
 
 fn handle_search(_matches: &ArgMatches) -> Result<()> {
     todo!()
-
 }
 
 fn handle_report(_matches: &ArgMatches) -> Result<()> {
     todo!()
-
 }
 
 fn handle_config(matches: &ArgMatches) -> Result<()> {

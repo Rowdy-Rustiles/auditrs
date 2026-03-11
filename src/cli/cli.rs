@@ -1,11 +1,10 @@
 //! # auditrs CLI Module
 //!
-//! This module defines the command-line interface for the auditrs audit event management tool.
-//! It provides a comprehensive set of subcommands for inspecting, managing, and configuring
-//! audit events and the auditrs daemon.
+//! This module defines the command-line interface for the auditrs audit event
+//! management tool. It provides a comprehensive set of subcommands for
+//! inspecting, managing, and configuring audit events and the auditrs daemon.
 
 use clap::{Arg, ArgAction, Command as ClapCommand};
-
 
 pub fn build_cli() -> ClapCommand {
     ClapCommand::new("auditrs")

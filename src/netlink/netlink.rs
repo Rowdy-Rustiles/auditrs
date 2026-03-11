@@ -1,9 +1,9 @@
 use super::{NetlinkAuditTransport, RawAuditRecord};
+use anyhow::{Context, Result};
 use audit::packet::AuditMessage;
 use futures::stream::StreamExt;
 use netlink_packet_core::NetlinkPayload;
 use tokio::sync::mpsc;
-use anyhow::{Context, Result};
 
 impl NetlinkAuditTransport {
     pub fn new() -> Self {
@@ -35,12 +35,10 @@ impl Default for NetlinkAuditTransport {
     }
 }
 
-async fn netlink_listener_task(
-    sender: mpsc::Sender<RawAuditRecord>,
-) -> Result<()> {
+async fn netlink_listener_task(sender: mpsc::Sender<RawAuditRecord>) -> Result<()> {
     // Create netlink socket connection
-    let (connection, mut handle, mut messages) = audit::new_connection()
-        .context(("Netlink socket connection failed."))?;
+    let (connection, mut handle, mut messages) =
+        audit::new_connection().context(("Netlink socket connection failed."))?;
 
     // Spawn connection task
     tokio::spawn(connection);
