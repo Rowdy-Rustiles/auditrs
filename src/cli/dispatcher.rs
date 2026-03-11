@@ -1,3 +1,8 @@
+//! CLI dispatcher module for routing subcommands to their respective handlers.
+//!
+//! This module contains the top-level `dispatch` function that matches CLI subcommands
+//! and delegates to handler functions.
+
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 

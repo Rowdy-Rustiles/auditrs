@@ -15,8 +15,7 @@ use strum::IntoEnumIterator;
 use toml;
 
 impl Filters {
-    /// Returns the list of record types currently defined in the filters (for
-    /// autocomplete).
+    /// Returns the list of record types currently defined in the filters (for autocomplete).
     pub fn record_types(&self) -> Vec<String> {
         self.0.iter().map(|f| f.record_type.clone()).collect()
     }
