@@ -26,9 +26,11 @@ fn is_root() -> Result<()> {
 }
 
 fn prepare_auditrs() -> Result<()> {
-    Command::new("auditctl").arg("-e").arg("1").output()?;
-    
-    Command::new("service").arg("auditd").arg("stop").output()?;
+    Command::new("sh")
+        .arg("-c")
+        .arg("auditctl -e 1 && service auditd stop")
+        .output()
+        .context("Command failed: `auditctl -e 1 && service auditd stop`")?;
     Ok(())
 }
 
@@ -36,12 +38,14 @@ fn prepare_auditrs() -> Result<()> {
 /// Both the parent (main) and child (daemon) will return up the call stack with
 /// a result. The parent process will wait a moment and check if the daemon's
 /// PID file exists.
-pub fn start_daemon() -> Result<(), anyhow::Error> {
+pub fn start_daemon() -> Result<()> {
     is_root()?;
-    prepare_auditrs()?;
+    prepare_auditrs()
+        .context("Could not stop auditd service with systemctl")?;
     let pid = pid_file_path();
     if let Some(parent) = pid.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent)
+        .context(format!("Could not create parent folders for {parent:?}"))?;
     }
     let stdout = File::create("/tmp/daemon.out")?;
     let stderr = File::create("/tmp/daemon.err")?;
