@@ -7,7 +7,7 @@ use crate::config::{
     AuditWatch, CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE, State, WatchAction, Watches,
     execute_watch_auditctl_command,
 };
-use crate::utils::{current_utc_string, strip_block_comments};
+use crate::utils::{capitalize_first_letter, current_utc_string, strip_block_comments};
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, formatter::StringFormatter, validator::Validation};
 use inquire::{MultiSelect, Select};
@@ -187,15 +187,11 @@ fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
 ///
 /// **Parameters:**
 ///
-/// * `watch`: The `AuditWatch` to add or replace in the rules file.
+/// * `watch`: The `AuditWatch` to append to the rules file. Multiple watches
+///   may now share the same path; they will be stored as distinct entries.
 fn set_watch(watch: AuditWatch) -> Result<()> {
     let mut current = load_watches()?;
-    // Replace or append.
-    if let Some(existing) = current.0.iter_mut().find(|f| f.path == watch.path) {
-        *existing = watch;
-    } else {
-        current.0.push(watch);
-    }
+    current.0.push(watch);
 
     persist_watches(&current.0)
 }
@@ -287,7 +283,7 @@ pub fn get_watches(state: &State) -> Result<()> {
             let actions_str = watch
                 .actions
                 .iter()
-                .map(|a| a.as_ref())
+                .map(|a| capitalize_first_letter(a.as_ref()))
                 .collect::<Vec<_>>()
                 .join(", ");
             println!(
@@ -302,99 +298,154 @@ pub fn get_watches(state: &State) -> Result<()> {
     Ok(())
 }
 
-/// Remove a watch from the rules file by its path.
+/// Remove a watch from the rules file by its key.
 ///
 /// **Parameters:**
 ///
-/// * `path`: String representation of the watch path to remove.
-fn remove_watch(path: &str) -> Result<()> {
+/// * `key`: The unique key identifying the watch to remove.
+fn remove_watch(key: &str) -> Result<()> {
     let mut current = load_watches()?;
-    current
-        .0
-        .retain(|w| !w.path.to_string_lossy().eq_ignore_ascii_case(path));
+    current.0.retain(|w| w.key != key);
     persist_watches(&current.0)
 }
 
+/// Replace an existing watch (identified by `old_key`) with `watch`.
+///
+/// **Parameters:**
+///
+/// * `old_key`: The key of the watch to replace.
+/// * `watch`: The new `AuditWatch` that will take its place.
+fn update_watch(old_key: &str, watch: AuditWatch) -> Result<()> {
+    let mut current = load_watches()?;
+    if let Some(existing) = current.0.iter_mut().find(|w| w.key == old_key) {
+        *existing = watch;
+    } else {
+        return Err(anyhow!("watch with key '{}' not found", old_key));
+    }
+    persist_watches(&current.0)
+}
+
+/// Build a human-readable display label for a watch, used by interactive
+/// prompts so users can identify which watch they are selecting.
+fn watch_display_label(w: &AuditWatch) -> String {
+    format!(
+        "{} (key: {}, recursive: {}, actions: [{}])",
+        w.path.to_string_lossy(),
+        w.key,
+        w.recursive,
+        w.actions
+            .iter()
+            .map(|a| a.as_ref())
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
 /// Remove a watch via interactive prompt with fuzzy autocomplete over existing
-/// watches only.
+/// watches. The autocomplete shows full watch details; the key is extracted
+/// from the selected entry.
 ///
 /// **Parameters:**
 ///
 /// * `state`: Shared application `State` used to obtain existing `Watches`.
 pub fn remove_watch_interactive(state: &State) -> Result<()> {
-    let existing = state.rules.watches.paths();
-    if existing.is_empty() {
+    let watches = &state.rules.watches.0;
+    if watches.is_empty() {
         return Err(anyhow!("No watches defined; nothing to remove."));
     }
-    let completer = StringListAutoCompleter::new(existing.clone());
-    let watch_path = inquire::Text::new("Select a watch path to remove:")
+
+    let labels: Vec<String> = watches.iter().map(watch_display_label).collect();
+    let label_to_key: Vec<(String, String)> = labels
+        .iter()
+        .zip(watches.iter())
+        .map(|(l, w)| (l.clone(), w.key.clone()))
+        .collect();
+
+    let completer = StringListAutoCompleter::new(labels.clone());
+    let selected_label = inquire::Text::new("Select a watch to remove:")
         .with_autocomplete(completer)
         .with_validator(move |input: &str| {
-            let trimmed = input.trim().to_lowercase();
-            if existing.iter().any(|s| s.eq_ignore_ascii_case(&trimmed)) {
+            let trimmed = input.trim();
+            if labels.iter().any(|l| l == trimmed) {
                 Ok(Validation::Valid)
             } else {
                 Ok(Validation::Invalid(
-                    "Please choose one of the existing watch paths (use suggestions).".into(),
+                    "Please choose one of the existing watches (use suggestions).".into(),
                 ))
             }
         })
-        .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?
         .trim()
-        .to_string()
-        .to_lowercase();
+        .to_string();
 
-    // This should always be Some because of the validator above
-    let watch_to_remove = state
-        .rules
-        .watches
-        .as_slice()
+    let selected_key = label_to_key
         .iter()
-        .find(|w| w.path.to_string_lossy().eq_ignore_ascii_case(&watch_path));
+        .find(|(l, _)| l == &selected_label)
+        .map(|(_, k)| k.clone())
+        .ok_or_else(|| anyhow!("failed to resolve key from selection"))?;
+
+    let watch_to_remove = watches.iter().find(|w| w.key == selected_key);
     if let Some(watch) = watch_to_remove {
         execute_watch_auditctl_command(watch, true)?;
     } else {
         unreachable!("Validator should be preventing this state")
     }
-    remove_watch(&watch_path)
+    remove_watch(&selected_key)
 }
 
-/// Update an existing watch via interactive prompt; watch path chosen from
-/// current watches only.
+/// Update an existing watch via interactive prompt. The autocomplete shows full
+/// watch details; the key is extracted from the selected entry to mutate the
+/// correct record.
 ///
 /// **Parameters:**
 ///
 /// * `state`: Shared application `State` used to obtain and update `Watches`.
 pub fn update_watch_interactive(state: &State) -> Result<()> {
-    let existing = state.rules.watches.paths();
-    if existing.is_empty() {
+    let watches = &state.rules.watches.0;
+    if watches.is_empty() {
         return Err(anyhow!(
             "No watches defined; add a watch first or use 'watch add'."
         ));
     }
-    let completer = StringListAutoCompleter::new(existing.clone());
-    let watch_path = inquire::Text::new("Select a watch path to update:")
+
+    let labels: Vec<String> = watches.iter().map(watch_display_label).collect();
+    let label_to_key: Vec<(String, String)> = labels
+        .iter()
+        .zip(watches.iter())
+        .map(|(l, w)| (l.clone(), w.key.clone()))
+        .collect();
+
+    let completer = StringListAutoCompleter::new(labels.clone());
+    let selected_label = inquire::Text::new("Select a watch to update:")
         .with_autocomplete(completer)
         .with_validator(move |input: &str| {
-            let trimmed = input.trim().to_lowercase();
-            if existing.iter().any(|s| s.eq_ignore_ascii_case(&trimmed)) {
+            let trimmed = input.trim();
+            if labels.iter().any(|l| l == trimmed) {
                 Ok(Validation::Valid)
             } else {
                 Ok(Validation::Invalid(
-                    "Please choose one of the existing watch paths (use suggestions).".into(),
+                    "Please choose one of the existing watches (use suggestions).".into(),
                 ))
             }
         })
-        .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?
         .trim()
-        .to_string()
-        .to_lowercase();
+        .to_string();
+
+    let selected_key = label_to_key
+        .iter()
+        .find(|(l, _)| l == &selected_label)
+        .map(|(_, k)| k.clone())
+        .ok_or_else(|| anyhow!("failed to resolve key from selection"))?;
+
+    let old_watch = watches
+        .iter()
+        .find(|w| w.key == selected_key)
+        .ok_or_else(|| anyhow!("watch with key '{}' not found", selected_key))?;
 
     let actions: Vec<String> = WatchAction::iter()
         .map(|a| a.as_ref().to_string())
@@ -408,21 +459,20 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
 
     let recursive = Confirm::new("Watch recursively?")
-        .with_default(true)
+        .with_default(old_watch.recursive)
         .prompt()
         .map_err(|e| anyhow!("{}", e))?;
 
-    let watch_actions = actions.clone();
-    let path_buf = PathBuf::from(watch_path.clone());
-    let key = generate_watch_key(&path_buf, &watch_actions, recursive);
+    let path_buf = old_watch.path.clone();
+    let new_key = generate_watch_key(&path_buf, &actions, recursive);
 
     let watch = AuditWatch {
         path: path_buf,
-        actions: watch_actions,
+        actions,
         recursive,
-        key,
+        key: new_key,
     };
-    set_watch(watch)
+    update_watch(&selected_key, watch)
 }
 
 /// Validate raw watch fields and construct an `AuditWatch`.
