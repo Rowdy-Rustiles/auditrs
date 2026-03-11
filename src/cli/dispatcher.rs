@@ -147,7 +147,7 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
 fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_watches(state),
-        Some(("add", _sub_m)) => add_watch_interactive(state),
+        Some(("add", _sub_m)) => add_watch_interactive(),
         Some(("update", _sub_m)) => update_watch_interactive(state),
         Some(("remove", _sub_m)) => remove_watch_interactive(state),
         Some(("import", sub_m)) => {

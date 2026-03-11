@@ -1,3 +1,7 @@
+//! Module defining auditrs's watch feature. This is a wrapper around the
+//! auditctl command as well as the logic behind how auditrs stores and manages
+//! watches.
+
 use crate::config::input_utils::{FilePathCompleter, StringListAutoCompleter};
 use crate::config::{
     AuditWatch, CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE, State, WatchAction, Watches,
@@ -18,6 +22,8 @@ use strum::IntoEnumIterator;
 use tokio::sync::watch;
 use toml;
 
+/// Implementation of the `Watches` struct. Defines the non-interactive
+/// functionaity for referencing watches as state.
 impl Watches {
     /// Returns the list of watched paths currently defined.
     pub fn paths(&self) -> Vec<String> {
@@ -102,8 +108,14 @@ pub fn load_watches() -> Result<Watches> {
     Watches::load()
 }
 
-/// Generatess a unique key for the watch rule. Used for identifying rules when
-/// they are deleted
+/// Generates a unique key for the watch rule. Used for identifying rules when
+/// they are deleted.
+///
+/// **Parameters:**
+///
+/// * `path`: Filesystem path being watched.
+/// * `actions`: List of `WatchAction`s associated with the watch.
+/// * `recursive`: Whether the watch applies recursively to subdirectories.
 fn generate_watch_key(path: &Path, actions: &[WatchAction], recursive: bool) -> String {
     let mut hasher = DefaultHasher::new();
     path.to_string_lossy().to_lowercase().hash(&mut hasher);
@@ -115,6 +127,13 @@ fn generate_watch_key(path: &Path, actions: &[WatchAction], recursive: bool) -> 
     format!("auditrs_watch_{:016x}", hash)
 }
 
+/// Persist the watches to `/etc/auditrs/rules.toml`.
+/// Accepts a slice of `AuditWatch`s.
+///
+/// **Parameters:**
+///
+/// * `watches`: A slice of `AuditWatch`s to persist. Referenced as `Watches` is
+///   a unit struct around a vector of `AuditWatch`s.
 fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
     let file_path = RULES_FILE;
     // Create a default config folder at /etc/auditrs if it doesn't exist
@@ -164,6 +183,11 @@ fn persist_watches(watches: &[AuditWatch]) -> Result<()> {
     Ok(())
 }
 
+/// Set a single watch in the watches file.
+///
+/// **Parameters:**
+///
+/// * `watch`: The `AuditWatch` to add or replace in the rules file.
 fn set_watch(watch: AuditWatch) -> Result<()> {
     let mut current = load_watches()?;
     // Replace or append.
@@ -177,7 +201,7 @@ fn set_watch(watch: AuditWatch) -> Result<()> {
 }
 
 /// Add a single watch via interactive prompts.
-pub fn add_watch_interactive(_state: &State) -> Result<()> {
+pub fn add_watch_interactive() -> Result<()> {
     let mut watch_path_str = inquire::Text::new("Enter a file or directory path to watch:")
         .with_autocomplete(FilePathCompleter::default())
         .with_validator(|input: &str| {
@@ -247,6 +271,10 @@ pub fn add_watch_interactive(_state: &State) -> Result<()> {
 }
 
 /// Gets all watches from the watches file using the pre-loaded state.
+///
+/// **Parameters:**
+///
+/// * `state`: Shared application `State` containing preloaded `Watches`.
 pub fn get_watches(state: &State) -> Result<()> {
     let watches = state.rules.watches.as_slice();
     if watches.is_empty() {
@@ -272,6 +300,11 @@ pub fn get_watches(state: &State) -> Result<()> {
     Ok(())
 }
 
+/// Remove a watch from the rules file by its path.
+///
+/// **Parameters:**
+///
+/// * `path`: String representation of the watch path to remove.
 fn remove_watch(path: &str) -> Result<()> {
     let mut current = load_watches()?;
     current
@@ -282,6 +315,10 @@ fn remove_watch(path: &str) -> Result<()> {
 
 /// Remove a watch via interactive prompt with fuzzy autocomplete over existing
 /// watches only.
+///
+/// **Parameters:**
+///
+/// * `state`: Shared application `State` used to obtain existing `Watches`.
 pub fn remove_watch_interactive(state: &State) -> Result<()> {
     let existing = state.rules.watches.paths();
     if existing.is_empty() {
@@ -325,6 +362,10 @@ pub fn remove_watch_interactive(state: &State) -> Result<()> {
 
 /// Update an existing watch via interactive prompt; watch path chosen from
 /// current watches only.
+///
+/// **Parameters:**
+///
+/// * `state`: Shared application `State` used to obtain and update `Watches`.
 pub fn update_watch_interactive(state: &State) -> Result<()> {
     let existing = state.rules.watches.paths();
     if existing.is_empty() {
@@ -382,6 +423,14 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
     set_watch(watch)
 }
 
+/// Validate raw watch fields and construct an `AuditWatch`.
+///
+/// **Parameters:**
+///
+/// * `path`: Raw filesystem path string.
+/// * `actions`: Parsed list of `WatchAction`s.
+/// * `recursive`: Whether the watch should be recursive.
+/// * `location`: Human-readable location string for error reporting.
 fn validate_and_build_watch(
     path: &str,
     actions: Vec<WatchAction>,
@@ -408,6 +457,12 @@ fn validate_and_build_watch(
     })
 }
 
+/// Import watches from a TOML rules file into `AuditWatch` values.
+///
+/// **Parameters:**
+///
+/// * `content`: Raw TOML file content.
+/// * `path`: Filesystem path to the TOML file, used in diagnostics.
 fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
     let cleaned = strip_block_comments(content);
     let root: toml::Value = toml::from_str(&cleaned)
@@ -486,8 +541,14 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
     Ok(watches)
 }
 
-/// Import watches from an external and load them into rules.toml (used in
-/// `auditrs watch import <file>` command)
+/// Import watches from an external `.ars` file and convert them into
+/// `AuditWatch` values (used internally by the `auditrs watch import <file>`
+/// command).
+///
+/// **Parameters:**
+///
+/// * `content`: Raw `.ars` file content.
+/// * `path`: Filesystem path to the `.ars` file, used in diagnostics.
 fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
     let cleaned = strip_block_comments(content);
     let reader = std::io::BufReader::new(cleaned.as_bytes());
@@ -542,7 +603,12 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
     Ok(watches)
 }
 
-/// Import watches from an external file (.toml or .ars format).
+/// Import watches from an external file (`.toml` or `.ars` format) and persist
+/// them into the main rules file.
+///
+/// **Parameters:**
+///
+/// * `file`: Path to the watch definition file to import.
 pub fn import_watches(file: &str) -> Result<()> {
     let path = Path::new(file);
     if !path.exists() {
@@ -586,6 +652,13 @@ pub fn import_watches(file: &str) -> Result<()> {
     Ok(())
 }
 
+/// Dump the currently configured watches into an external file in either TOML
+/// or ARS format, preserving a generated header.
+///
+/// **Parameters:**
+///
+/// * `file`: Base path (with or without extension) to write the dump to.
+/// * `state`: Shared application `State` containing the `Watches` to dump.
 pub fn dump_watches(file: &str, state: &State) -> Result<()> {
     let watches = state.rules.watches.as_slice();
     if watches.is_empty() {
@@ -627,6 +700,12 @@ pub fn dump_watches(file: &str, state: &State) -> Result<()> {
     Ok(())
 }
 
+/// Serialize the provided watches into TOML text containing a top-level
+/// `[[watches]]` array.
+///
+/// **Parameters:**
+///
+/// * `watches`: Slice of `AuditWatch`s to serialize.
 fn to_toml_format(watches: &[AuditWatch]) -> Result<String> {
     let mut table = toml::map::Map::new();
     table.insert(
@@ -659,6 +738,11 @@ fn to_toml_format(watches: &[AuditWatch]) -> Result<String> {
     Ok(toml::to_string_pretty(&toml::Value::Table(table))?)
 }
 
+/// Serialize the provided watches into the `.ars` line-based text format.
+///
+/// **Parameters:**
+///
+/// * `watches`: Slice of `AuditWatch`s to serialize.
 fn to_ars_format(watches: &[AuditWatch]) -> Result<String> {
     let mut content = String::new();
     for watch in watches {
