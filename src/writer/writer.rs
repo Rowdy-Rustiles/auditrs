@@ -107,7 +107,6 @@ impl AuditLogWriter {
         writeln!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
 
-
         if write_primary {
             self.write_primary(event_str)?;
         }

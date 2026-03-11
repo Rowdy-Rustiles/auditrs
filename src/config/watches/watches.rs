@@ -246,6 +246,7 @@ pub fn add_watch_interactive() -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
 
     // We only prompt for recursive if the path is a directory
+    // TODO: recursive == false is not working yet
     let mut recursive = false;
     if Path::new(&watch_path_str).is_dir() {
         recursive = Confirm::new("Watch recursively?")
@@ -290,10 +291,11 @@ pub fn get_watches(state: &State) -> Result<()> {
                 .collect::<Vec<_>>()
                 .join(", ");
             println!(
-                "    {}: \n\tActions: {} \n\tRecursive?: {}",
+                "    {}: \n\tActions: {} \n\tRecursive?: {}\n\tKey: {}",
                 watch.path.to_string_lossy().into_owned(),
                 actions_str,
-                recursive_str
+                recursive_str,
+                watch.key
             );
         }
     }
