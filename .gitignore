@@ -1,11 +1,8 @@
-/.idea
-/target
-workspace.code-workspace
-*.pem
-temp/
+target/
 output/
 .idea/
-*.idea
-*.idea/
 ec2/
 tmp/
+.vscode/
+workspace.code-workspace
+*.pem

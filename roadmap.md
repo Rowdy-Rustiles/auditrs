@@ -8,11 +8,11 @@
 - [ ] Write events to log files in JSON and legacy formats
 
 ## Milestone 2: Configuration, Rotation & Rule Management
-- [ ] Implement configuration system for process settings and log policies
-- [ ] Implement log rotation mechanism for file size and retention management
-- [ ] Allow users to read, write, and list audit rules through CLI
-- [ ] Support audit rules defined from rules files for compatibility
-- [ ] Create installation script for auditd replacement and permissions setup
+- [x] Implement configuration system for process settings and log policies
+- [x] Implement log rotation mechanism for file size and retention management
+- [x] Allow users to read, write, and list audit rules through CLI
+- [-] Support audit rules defined from rules files for compatibility
+- [-] Create installation script for auditd replacement and permissions setup
 
 --- At this point, we should be near feature parity with auditd ---
 
