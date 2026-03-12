@@ -6,6 +6,11 @@
 
 use clap::{Arg, ArgAction, Command as ClapCommand};
 
+/// Builds the top-level command-line interface for the `auditrs` binary.
+///
+/// This function defines the root command and registers all supported
+/// subcommands for daemon control, event inspection, reporting, and
+/// configuration management.
 pub fn build_cli() -> ClapCommand {
     ClapCommand::new("auditrs")
         .about("Inspect and manage audit events and configuration")
@@ -23,6 +28,11 @@ pub fn build_cli() -> ClapCommand {
         .subcommand(build_config())
 }
 
+/// Builds the `dump` subcommand.
+///
+/// The `dump` command writes matching audit events to stdout or an output
+/// file, with optional filters for time range, event type, user, result,
+/// format, and follow mode.
 fn build_dump() -> ClapCommand {
     ClapCommand::new("dump")
         .about("Dump audit events to a file or stdout")
@@ -83,6 +93,11 @@ fn build_dump() -> ClapCommand {
         )
 }
 
+/// Builds the `search` subcommand.
+///
+/// The `search` command queries audit events using a free-text or key-value
+/// expression and supports additional filters such as time range, field,
+/// event type, user, result, and output format.
 fn build_search() -> ClapCommand {
     ClapCommand::new("search")
         .about("Search audit events")
@@ -144,6 +159,11 @@ fn build_search() -> ClapCommand {
         )
 }
 
+/// Builds the `report` subcommand.
+///
+/// The `report` command generates aggregate summaries over audit events
+/// within an optional time window and supports grouping, failed-only
+/// filtering, and multiple output formats.
 fn build_report() -> ClapCommand {
     ClapCommand::new("report")
         .about("Generate summary reports over audit events")
@@ -187,6 +207,11 @@ fn build_report() -> ClapCommand {
         )
 }
 
+/// Builds the `config` subcommand.
+///
+/// The `config` command provides nested subcommands for reading and updating
+/// daemon configuration values such as directories, size limits, and log
+/// format.
 fn build_config() -> ClapCommand {
     ClapCommand::new("config")
         .about("Inspect and update audit configuration")
@@ -255,6 +280,10 @@ fn build_config() -> ClapCommand {
         .arg_required_else_help(true)
 }
 
+/// Builds the `filter` subcommand.
+///
+/// The `filter` command provides operations for viewing, adding, removing,
+/// updating, importing, and dumping audit filter rules.
 fn build_filter() -> ClapCommand {
     ClapCommand::new("filter")
         .about("Commands for managing log filters")
@@ -292,6 +321,10 @@ fn build_filter() -> ClapCommand {
         .arg_required_else_help(true)
 }
 
+/// Builds the `watch` subcommand.
+///
+/// The `watch` command provides operations for viewing, adding, removing,
+/// updating, importing, and dumping audit watch rules.
 fn build_watch() -> ClapCommand {
     ClapCommand::new("watch")
         .about("Commands for managing log watches")
@@ -329,6 +362,7 @@ fn build_watch() -> ClapCommand {
         .arg_required_else_help(true)
 }
 
+/// Tests for command-line parsing behavior in the CLI module.
 #[cfg(test)]
 mod tests {
     use super::*;
