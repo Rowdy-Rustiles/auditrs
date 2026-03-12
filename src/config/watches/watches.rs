@@ -211,8 +211,7 @@ pub fn add_watch_interactive() -> Result<()> {
         })
         .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?
+        .prompt()?
         .trim()
         .to_string()
         .to_lowercase();
@@ -234,11 +233,10 @@ pub fn add_watch_interactive() -> Result<()> {
                 Ok(Validation::Valid)
             }
         })
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?;
+        .prompt()?;
     let actions = action_str
         .iter()
-        .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(|e| anyhow!("{}", e)))
+        .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(anyhow::Error::from))
         .collect::<Result<Vec<_>>>()?;
 
     // We only prompt for recursive if the path is a directory
@@ -248,7 +246,7 @@ pub fn add_watch_interactive() -> Result<()> {
         recursive = Confirm::new("Watch recursively?")
             .with_default(true)
             .prompt()
-            .map_err(|e| anyhow!("{}", e))?;
+            ?;
     }
 
     // Derive the absolute path
@@ -376,7 +374,7 @@ pub fn remove_watch_interactive(state: &State) -> Result<()> {
         })
         .with_page_size(12)
         .prompt()
-        .map_err(|e| anyhow!("{}", e))?
+        ?
         .trim()
         .to_string();
 
@@ -432,7 +430,7 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
         })
         .with_page_size(12)
         .prompt()
-        .map_err(|e| anyhow!("{}", e))?
+        ?
         .trim()
         .to_string();
 
@@ -452,16 +450,15 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
         .collect();
     let action_str = MultiSelect::new("Select new actions for this watch", actions)
         .prompt()
-        .map_err(|e| anyhow!("{}", e))?;
+        ?;
     let actions = action_str
         .iter()
-        .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(|e| anyhow!("{}", e)))
+        .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(anyhow::Error::from))
         .collect::<Result<Vec<_>>>()?;
 
     let recursive = Confirm::new("Watch recursively?")
         .with_default(old_watch.recursive)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?;
+        .prompt()?;
 
     let path_buf = old_watch.path.clone();
     let new_key = generate_watch_key(&path_buf, &actions, recursive);
@@ -722,7 +719,7 @@ pub fn dump_watches(file: &str, state: &State) -> Result<()> {
         FILTER_FILE_EXTENSIONS.to_vec(),
     )
     .prompt()
-    .map_err(|e| anyhow!("{}", e))?
+    ?
     .to_lowercase();
 
     // Replace any user-given extension with the selected extension from the

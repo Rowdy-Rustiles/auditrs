@@ -170,8 +170,7 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
         })
         .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?
+        .prompt()?
         .trim()
         .to_string()
         .to_lowercase();
@@ -184,10 +183,9 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
         .map(|a| a.as_ref().to_string())
         .collect();
     let action_str = Select::new("Select an action for this record type", actions)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?;
+        .prompt()?;
     let action =
-        FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
+        FilterAction::from_str(&action_str.to_lowercase())?;
 
     let filter = AuditFilter {
         record_type,
@@ -219,8 +217,7 @@ pub fn remove_filter_interactive(state: &State) -> Result<()> {
         })
         .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?
+        .prompt()?
         .trim()
         .to_string()
         .to_lowercase();
@@ -253,8 +250,7 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         })
         .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?
+        .prompt()?
         .trim()
         .to_string()
         .to_lowercase();
@@ -263,10 +259,9 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         .map(|a| a.as_ref().to_string())
         .collect();
     let action_str = Select::new("Select new action for this record type", actions)
-        .prompt()
-        .map_err(|e| anyhow!("{}", e))?;
+        .prompt()?;
     let action =
-        FilterAction::from_str(&action_str.to_lowercase()).map_err(|e| anyhow!("{}", e))?;
+        FilterAction::from_str(&action_str.to_lowercase())?;
 
     let filter = AuditFilter {
         record_type,
@@ -458,8 +453,7 @@ pub fn dump_filters(file: &str, state: &State) -> Result<()> {
         "Select a filter file format",
         FILTER_FILE_EXTENSIONS.to_vec(),
     )
-    .prompt()
-    .map_err(|e| anyhow!("{}", e))?
+    .prompt()?
     .to_lowercase();
 
     // Replace any user-given extension with the selected extension from the
