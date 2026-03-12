@@ -26,25 +26,17 @@ jobs:
       - name: Clean docs folder
         run: cargo clean --doc
       - name: Build docs
-        run: cargo doc --no-deps
+        run: cargo doc --no-deps --lib
       - name: Remove lock file
         run: rm target/doc/.lock
       - name: Restructure docs
         run: |
-          cp -r target/doc/static.files target/doc/auditrs/
-          cp target/doc/crates.js target/doc/auditrs/
-          cp target/doc/src-files.js target/doc/auditrs/
-          cp target/doc/auditrs/index.html target/doc/index.html
-      - name: Remove lock file
-        run: rm target/doc/.lock
+          cp -r target/doc/auditrs/* target/doc/
+          cp -r target/doc/auditrs/* target/doc/ && rm -rf target/doc/auditrs
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: target/doc/auditrs
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: target/doc/auditrs
+          path: target/doc
   deploy-docs:
     name: Deploy Docs
     environment:
