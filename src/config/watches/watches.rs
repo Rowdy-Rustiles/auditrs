@@ -97,7 +97,7 @@ impl Watches {
                     })
                     .collect()
             })
-            .ok_or_else(|| anyhow!("Failed to parse watches"))?;
+            .ok_or(anyhow!("Failed to parse watch file:\n{file_path}\n----------:\n{content}\n----------"))?;
 
         Ok(Watches(watches_vec))
     }

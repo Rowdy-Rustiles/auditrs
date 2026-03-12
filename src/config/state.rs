@@ -2,7 +2,7 @@
 //! loading function.
 
 use crate::config::*;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 /// The state contians all active settings related to the auditrs daemon.
 /// Since all CLI commands are atomic, the state is loaded each time a command
@@ -12,9 +12,19 @@ use anyhow::Result;
 /// convenient interface for accessing the config state.
 impl State {
     pub fn load_state() -> Result<State> {
-        let config = load_config()?;
-        let filters = load_filters()?;
-        let watches = load_watches()?;
+        let config = load_config()
+            .context("Could not load config")?;
+        let filters = load_filters()
+            .context("Could not load filters")?;
+        // Will load empty watches if there's an  error
+        let watches = match load_watches() {
+            Ok(w) => w,
+            Err(e) => {
+                eprintln!("Error loading watch file: {e}\nDefaulting to no watches");
+                Watches::empty()
+            }
+        };
+
         let rules = Rules { filters, watches };
         Ok(State { config, rules })
     }
