@@ -43,7 +43,7 @@
 mod correlator;
 mod event;
 
-use crate::parser::ParsedAuditRecord;
+use crate::core::parser::ParsedAuditRecord;
 use std::collections::HashMap;
 use std::time::{Instant, SystemTime};
 

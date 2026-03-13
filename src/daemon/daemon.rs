@@ -11,7 +11,6 @@ use crate::daemon::PID_FILE_NAME;
 
 use daemonize::{Daemonize, Outcome};
 
-
 /// Creates a daemon process that runs in the background.
 /// Both the parent (main) and child (daemon) will return up the call stack with
 /// a result. The parent process will wait a moment and check if the daemon's
@@ -71,8 +70,7 @@ pub fn start_daemon() -> Result<()> {
 pub fn stop_daemon() -> Result<()> {
     is_root()?;
     let path = pid_file_path();
-    let contents = fs::read_to_string(&path)
-        .context("No PID file found. Is AuditRS running?")?;
+    let contents = fs::read_to_string(&path).context("No PID file found. Is AuditRS running?")?;
     let pid: i32 = contents
         .trim()
         .parse()
@@ -85,19 +83,16 @@ pub fn stop_daemon() -> Result<()> {
 
 /// True if the PID file exists and that process is still running.
 pub fn is_running() -> Result<bool> {
-    Ok(
-        fs::exists(pid_file_path())?
-        &&
-        unsafe { libc::kill(read_pid()?, 0) == 0 }
-    )
+    Ok(fs::exists(pid_file_path())? && unsafe { libc::kill(read_pid()?, 0) == 0 })
 }
 
 /// Read the PID from the daemon's PID file.
 pub fn read_pid() -> Result<i32> {
     let path = pid_file_path();
-    let contents = fs::read_to_string(&path)
-        .context("Could not read PID file")?;
-    contents.trim().parse::<i32>()
+    let contents = fs::read_to_string(&path).context("Could not read PID file")?;
+    contents
+        .trim()
+        .parse::<i32>()
         .context(format!("Could not parse PID file contents: {contents}"))
 }
 
@@ -125,7 +120,7 @@ pub fn pid_file_path() -> PathBuf {
 
 /// Checks if the user is running with root privileges.
 /// Users without permissions will write to relative paths, we want to avoid
-/// this. 
+/// this.
 /// TODO: Ideally we check if the user has write access to the log directory
 fn is_root() -> Result<()> {
     unsafe {

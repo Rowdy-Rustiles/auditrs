@@ -6,15 +6,12 @@
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 
-use crate::config::{
-    GetConfigVariables, LogFormat, SetConfigVariables, State, add_filter_interactive,
-    add_watch_interactive, dump_filters, dump_watches, get_config, get_filters, get_watches,
-    import_filters, import_watches, remove_filter_interactive, remove_watch_interactive,
-    set_config, update_filter_interactive, update_watch_interactive,
-};
+use crate::config::*;
 use crate::daemon::control::{
     reboot_auditrs, reload_auditrs, start_auditrs, status_auditrs, stop_auditrs,
 };
+use crate::rules::*;
+use crate::state::*;
 
 /// Top-level entry point for handling CLI subcommands
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
@@ -75,9 +72,7 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
 
 fn handle_config_set(matches: &ArgMatches) -> Result<()> {
     let result = match matches.subcommand() {
-        Some(("format", _m)) => {
-            set_config(SetConfigVariables::LogFormat)
-        }
+        Some(("format", _m)) => set_config(SetConfigVariables::LogFormat),
         Some(("log-directory", m)) => {
             let value = m
                 .get_one::<String>("value")
@@ -99,15 +94,9 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
                 .clone();
             set_config(SetConfigVariables::PrimaryDirectory { value })
         }
-        Some(("log-size", _m)) => {
-            set_config(SetConfigVariables::LogSize)
-        }
-        Some(("journal-size", _m)) => {
-            set_config(SetConfigVariables::JournalSize)
-        }
-        Some(("primary-size", _m)) => {
-            set_config(SetConfigVariables::PrimarySize)
-        }
+        Some(("log-size", _m)) => set_config(SetConfigVariables::LogSize),
+        Some(("journal-size", _m)) => set_config(SetConfigVariables::JournalSize),
+        Some(("primary-size", _m)) => set_config(SetConfigVariables::PrimarySize),
         _ => Ok(()),
     }
     .context("Could not set config");

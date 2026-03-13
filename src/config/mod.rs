@@ -14,25 +14,14 @@
 
 pub mod auditctl;
 pub mod config;
-pub mod filters;
-pub mod input_utils;
-pub mod state;
-pub mod watches;
 
 pub use config::{get_config, load_config, set_config};
 // TODO: a lot of the logic between filters and watches is the same, we might
 // want to consider refactoring and consolidating some of their functions.
 // For now, duplication is ok
+use crate::rules::Rules;
 pub use auditctl::{execute_auditctl_command, execute_watch_auditctl_command};
-pub use filters::{
-    AuditFilter, FilterAction, Filters, add_filter_interactive, dump_filters, get_filters,
-    import_filters, load_filters, remove_filter_interactive, update_filter_interactive,
-};
 use serde::Deserialize;
-pub use watches::{
-    AuditWatch, WatchAction, Watches, add_watch_interactive, dump_watches, get_watches,
-    import_watches, load_watches, remove_watch_interactive, update_watch_interactive,
-};
 
 /// The minimum log size for the auditrs daemon.
 pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
@@ -74,26 +63,6 @@ log_size = 4194304
 journal_size = 16
 primary_size = 67108864
 "#;
-
-/// An interface for exposing the current state of the auditrs configuration to
-/// the configuration manipulation functions.
-#[derive(Debug)]
-pub struct State {
-    /// The core configuration for the auditrs daemon.
-    pub(crate) config: AuditConfig,
-    /// The rules for the auditrs daemon.
-    pub(crate) rules: Rules,
-}
-
-/// Audit rules are a collections of filters and watches that are applied to
-/// audit events before they can be written to the primary log.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Rules {
-    /// The filters for the auditrs daemon.
-    pub(crate) filters: Filters,
-    /// The watches for the auditrs daemon.
-    pub(crate) watches: Watches,
-}
 
 /// The core configuration of the auditrs daemon, which is used to define the
 /// structural aspects of the daemon, such as log directories and file sizes.

@@ -1,10 +1,8 @@
 #![allow(warnings)]
 pub mod cli;
 pub mod config;
-pub mod correlator;
+pub mod core;
 pub mod daemon;
-pub mod enricher;
-pub mod netlink;
-pub mod parser;
+pub mod rules;
+pub mod state;
 pub mod utils;
-pub mod writer;

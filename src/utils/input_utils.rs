@@ -1,4 +1,4 @@
-use crate::parser::audit_types::RecordType;
+use crate::core::parser::audit_types::RecordType;
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use inquire::{

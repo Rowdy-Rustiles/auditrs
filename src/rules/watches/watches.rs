@@ -2,12 +2,13 @@
 //! auditctl command as well as the logic behind how auditrs stores and manages
 //! watches.
 
-use crate::config::input_utils::{FilePathCompleter, StringListAutoCompleter};
-use crate::config::{
-    AuditWatch, CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE, State, WatchAction, Watches,
-    execute_watch_auditctl_command,
+use crate::config::*;
+use crate::rules::{AuditWatch, WatchAction, Watches};
+use crate::state::*;
+use crate::utils::{
+    FilePathCompleter, StringListAutoCompleter, capitalize_first_letter, current_utc_string,
+    strip_block_comments,
 };
-use crate::utils::{capitalize_first_letter, current_utc_string, strip_block_comments};
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, formatter::StringFormatter, validator::Validation};
 use inquire::{MultiSelect, Select};
@@ -95,16 +96,10 @@ impl Watches {
                         recursive,
                         key,
                     })
-<<<<<<< Updated upstream
-                    .collect()
-            })
-            .ok_or(anyhow!("Failed to parse watch file:\n{file_path}\n----------:\n{content}\n----------"))?;
-=======
                 })
                 .collect(),
             None => Vec::new(),
         };
->>>>>>> Stashed changes
 
         Ok(Watches(watches_vec))
     }
@@ -252,8 +247,7 @@ pub fn add_watch_interactive() -> Result<()> {
     if Path::new(&watch_path_str).is_dir() {
         recursive = Confirm::new("Watch recursively?")
             .with_default(true)
-            .prompt()
-            ?;
+            .prompt()?;
     }
 
     // Derive the absolute path
@@ -380,8 +374,7 @@ pub fn remove_watch_interactive(state: &State) -> Result<()> {
             }
         })
         .with_page_size(12)
-        .prompt()
-        ?
+        .prompt()?
         .trim()
         .to_string();
 
@@ -436,8 +429,7 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
             }
         })
         .with_page_size(12)
-        .prompt()
-        ?
+        .prompt()?
         .trim()
         .to_string();
 
@@ -455,9 +447,7 @@ pub fn update_watch_interactive(state: &State) -> Result<()> {
     let actions: Vec<String> = WatchAction::iter()
         .map(|a| a.as_ref().to_string())
         .collect();
-    let action_str = MultiSelect::new("Select new actions for this watch", actions)
-        .prompt()
-        ?;
+    let action_str = MultiSelect::new("Select new actions for this watch", actions).prompt()?;
     let actions = action_str
         .iter()
         .map(|a| WatchAction::from_str(&a.to_lowercase()).map_err(anyhow::Error::from))
@@ -725,8 +715,7 @@ pub fn dump_watches(file: &str, state: &State) -> Result<()> {
         "Select a watch file format",
         FILTER_FILE_EXTENSIONS.to_vec(),
     )
-    .prompt()
-    ?
+    .prompt()?
     .to_lowercase();
 
     // Replace any user-given extension with the selected extension from the

@@ -1,9 +1,10 @@
-use crate::config::input_utils::{RecordTypeAutoCompleter, StringListAutoCompleter};
-use crate::config::{
-    AuditFilter, CONFIG_DIR, FILTER_FILE_EXTENSIONS, FilterAction, Filters, RULES_FILE, State,
+use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
+use crate::core::parser::audit_types::RecordType;
+use crate::rules::*;
+use crate::state::*;
+use crate::utils::{
+    RecordTypeAutoCompleter, StringListAutoCompleter, current_utc_string, strip_block_comments,
 };
-use crate::parser::audit_types::RecordType;
-use crate::utils::{current_utc_string, strip_block_comments};
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
@@ -189,10 +190,8 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
     let actions: Vec<String> = FilterAction::iter()
         .map(|a| a.as_ref().to_string())
         .collect();
-    let action_str = Select::new("Select an action for this record type", actions)
-        .prompt()?;
-    let action =
-        FilterAction::from_str(&action_str.to_lowercase())?;
+    let action_str = Select::new("Select an action for this record type", actions).prompt()?;
+    let action = FilterAction::from_str(&action_str.to_lowercase())?;
 
     let filter = AuditFilter {
         record_type,
@@ -265,10 +264,8 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
     let actions: Vec<String> = FilterAction::iter()
         .map(|a| a.as_ref().to_string())
         .collect();
-    let action_str = Select::new("Select new action for this record type", actions)
-        .prompt()?;
-    let action =
-        FilterAction::from_str(&action_str.to_lowercase())?;
+    let action_str = Select::new("Select new action for this record type", actions).prompt()?;
+    let action = FilterAction::from_str(&action_str.to_lowercase())?;
 
     let filter = AuditFilter {
         record_type,

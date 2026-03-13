@@ -1,8 +1,9 @@
 //! Writer module implementation.
 
 use super::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary};
-use crate::config::{AuditConfig, LogFormat, Rules, State};
-use crate::correlator::AuditEvent;
+use crate::config::{AuditConfig, LogFormat};
+use crate::core::correlator::AuditEvent;
+use crate::state::*;
 use crate::utils::*;
 use anyhow::Result;
 use std::fs::{OpenOptions, create_dir_all};

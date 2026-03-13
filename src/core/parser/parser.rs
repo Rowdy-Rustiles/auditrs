@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use super::{ParsedAuditRecord, RecordData};
-use crate::netlink::RawAuditRecord;
+use crate::core::netlink::RawAuditRecord;
 use crate::utils::timestamp_string_to_systemtime;
 use nom::Finish;
 use nom::{

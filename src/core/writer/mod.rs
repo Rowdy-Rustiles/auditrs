@@ -2,7 +2,8 @@
 
 mod writer;
 
-use crate::config::{LogFormat, State};
+use crate::config::LogFormat;
+use crate::state::*;
 use std::fs::File;
 use std::path::PathBuf;
 

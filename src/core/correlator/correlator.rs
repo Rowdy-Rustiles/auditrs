@@ -1,7 +1,7 @@
 use std::collections::{HashMap, hash_map::Entry};
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::parser::ParsedAuditRecord;
+use crate::core::parser::ParsedAuditRecord;
 
 use super::Correlator;
 

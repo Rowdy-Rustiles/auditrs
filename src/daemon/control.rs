@@ -13,8 +13,7 @@ pub fn start_auditrs(reboot: bool) -> Result<()> {
         return Ok(());
     }
     println!("Starting auditrs...");
-    start_daemon()
-    .context("Failed to start daemon")?;
+    start_daemon().context("Failed to start daemon")?;
     if !reboot {
         colorize_println("Auditrs started successfully", Colors::BrightGreenFg);
     }

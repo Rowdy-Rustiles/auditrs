@@ -5,12 +5,14 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
 
-use crate::config::{AuditConfig, Rules, State};
-use crate::correlator::{AuditEvent, Correlator};
+use crate::core::{
+    correlator::{AuditEvent, Correlator},
+    netlink::{NetlinkAuditTransport, RawAuditRecord},
+    parser::ParsedAuditRecord,
+    writer::AuditLogWriter,
+};
 use crate::daemon::daemon;
-use crate::netlink::{NetlinkAuditTransport, RawAuditRecord};
-use crate::parser::ParsedAuditRecord;
-use crate::writer::AuditLogWriter;
+use crate::state::{AuditConfig, Rules, State};
 
 /// Launches the auditrs daemons' component threads
 pub async fn run_worker() -> Result<()> {

@@ -48,8 +48,7 @@ impl AuditConfig {
 
         // The TOML file has a top-level `[settings]` table; we map that into
         // `AuditConfig`.
-        let settings = config
-            .get::<AuditConfig>("settings")?;
+        let settings = config.get::<AuditConfig>("settings")?;
         Ok(settings)
     }
 
@@ -163,7 +162,7 @@ impl AuditConfig {
 
         write_result
             .with_context(|| format!("Failed to save config to {}", CONFIG_FILE))
-            .inspect( |_| println!("Config successfully saved to {}", CONFIG_FILE)) 
+            .inspect(|_| println!("Config successfully saved to {}", CONFIG_FILE))
     }
 
     /// Print config values (used by `config get`).
