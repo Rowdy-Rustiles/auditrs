@@ -1,9 +1,7 @@
 //! Writer module implementation.
 
 use super::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary};
-use crate::config::AuditConfig;
-use crate::config::LogFormat;
-use crate::config::State;
+use crate::config::{AuditConfig, LogFormat, Rules, State};
 use crate::correlator::AuditEvent;
 use crate::utils::*;
 use anyhow::Result;
@@ -285,5 +283,13 @@ impl AuditLogWriter {
 
         // Reopen active file at new location/extension using updated settings
         self.open_fresh_active_for_current_settings()
+    }
+
+    /// Reload rules (filters + watches) used by the writer.
+    ///
+    /// Currently this primarily affects which events are written to the primary
+    /// log, based on the configured watches.
+    pub fn reload_rules(&mut self, rules: &Rules) {
+        self.state.rules = rules.clone();
     }
 }

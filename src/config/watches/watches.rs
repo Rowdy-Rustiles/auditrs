@@ -59,45 +59,52 @@ impl Watches {
         }
 
         let root: toml::Value = toml::from_str(&content)?;
-        let watches_vec = root
-            .get("watches")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_table())
-                    .filter_map(|table| {
-                        let path = table.get("path")?.as_str()?.to_string();
 
-                        let actions: Vec<WatchAction> =
-                            table.get("actions").and_then(|v| v.as_array()).map(|arr| {
-                                arr.iter()
-                                    .filter_map(|v| v.as_str())
-                                    .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
-                                    .collect::<Vec<_>>()
-                            })?;
+        // Gracefully handle rules files that do not yet contain a `watches`
+        // section (for example, a freshly created file that only has filters).
+        let watches_vec = match root.get("watches").and_then(|v| v.as_array()) {
+            Some(arr) => arr
+                .iter()
+                .filter_map(|v| v.as_table())
+                .filter_map(|table| {
+                    let path = table.get("path")?.as_str()?.to_string();
 
-                        if actions.is_empty() {
-                            return None;
-                        }
+                    let actions: Vec<WatchAction> =
+                        table.get("actions").and_then(|v| v.as_array()).map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str())
+                                .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
+                                .collect::<Vec<_>>()
+                        })?;
 
-                        let recursive = table.get("recursive").and_then(|v| v.as_bool())?;
+                    if actions.is_empty() {
+                        return None;
+                    }
 
-                        let path_buf = PathBuf::from(&path);
-                        let key = table
-                            .get("key")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string())?;
+                    let recursive = table.get("recursive").and_then(|v| v.as_bool())?;
 
-                        Some(AuditWatch {
-                            path: path_buf,
-                            actions,
-                            recursive,
-                            key,
-                        })
+                    let path_buf = PathBuf::from(&path);
+                    let key = table
+                        .get("key")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())?;
+
+                    Some(AuditWatch {
+                        path: path_buf,
+                        actions,
+                        recursive,
+                        key,
                     })
+<<<<<<< Updated upstream
                     .collect()
             })
             .ok_or(anyhow!("Failed to parse watch file:\n{file_path}\n----------:\n{content}\n----------"))?;
+=======
+                })
+                .collect(),
+            None => Vec::new(),
+        };
+>>>>>>> Stashed changes
 
         Ok(Watches(watches_vec))
     }

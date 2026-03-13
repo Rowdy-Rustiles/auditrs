@@ -36,12 +36,12 @@ pub enum WatchAction {
 /// system paths are to be monitored and logged into the primary log. These can
 /// be combined with filters to create a rule set that is narrowed on system
 /// paths and record types.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Watches(pub(crate) Vec<AuditWatch>);
 
 /// The internal auditrs representation of a single watch, which is a system
 /// path coupled with the actions to be taken on it.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AuditWatch {
     pub path: PathBuf,
     pub actions: Vec<WatchAction>,

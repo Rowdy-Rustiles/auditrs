@@ -107,6 +107,13 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
     // Overwrite just the `filters` section while preserving others (e.g. `watches`)
     root_table.insert("filters".into(), toml::Value::Array(array));
 
+    // Ensure a `watches` key exists so that a freshly created rules file
+    // always has both top-level sections initialized.
+    // should be raised elsewhere
+    if !root_table.contains_key("watches") {
+        root_table.insert("watches".into(), toml::Value::Array(Vec::new()));
+    }
+
     std::fs::write(
         file_path,
         toml::to_string_pretty(&toml::Value::Table(root_table))?,

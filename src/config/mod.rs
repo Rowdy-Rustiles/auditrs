@@ -87,7 +87,7 @@ pub struct State {
 
 /// Audit rules are a collections of filters and watches that are applied to
 /// audit events before they can be written to the primary log.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Rules {
     /// The filters for the auditrs daemon.
     pub(crate) filters: Filters,

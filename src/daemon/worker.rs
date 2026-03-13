@@ -5,7 +5,7 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
 
-use crate::config::{AuditConfig, load_config};
+use crate::config::{AuditConfig, Rules, State};
 use crate::correlator::{AuditEvent, Correlator};
 use crate::daemon::daemon;
 use crate::netlink::{NetlinkAuditTransport, RawAuditRecord};
@@ -14,11 +14,13 @@ use crate::writer::AuditLogWriter;
 
 /// Launches the auditrs daemons' component threads
 pub async fn run_worker() -> Result<()> {
-    // We watch to see if the config file changes, if so, we
-    // send the new config into the config transmitter channel to
-    // propagate to the necessary components.
-    let config = load_config()?;
-    let (config_tx, config_rx) = watch::channel(config);
+    // We watch to see if the config and rules files change; on reload, we
+    // send the new values into watch channels to propagate to the necessary
+    // components (currently the writer).
+    let state = State::load_state()?;
+
+    let (config_tx, config_rx) = watch::channel(state.config);
+    let (rules_tx, rules_rx) = watch::channel(state.rules);
 
     let writer = AuditLogWriter::new()?;
     let transport = NetlinkAuditTransport::new();
@@ -30,7 +32,7 @@ pub async fn run_worker() -> Result<()> {
 
     let parser_task = spawn_parser_task(raw_audit_rx, parsed_audit_tx);
     let correlator_task = spawn_correlator_task(correlator, parsed_audit_rx, correlated_event_tx);
-    let writer_task = spawn_writer_task(writer, correlated_event_rx, config_rx);
+    let writer_task = spawn_writer_task(writer, correlated_event_rx, config_rx, rules_rx);
 
     let mut sigterm = signal(SignalKind::terminate())?;
     let mut sighup = signal(SignalKind::hangup())?;
@@ -39,10 +41,15 @@ pub async fn run_worker() -> Result<()> {
             _ = signal::ctrl_c() => break,
             _ = sigterm.recv() => break,
             _ = sighup.recv() => {
-                match load_config() {
-                    Ok(cfg) => { let _ = config_tx.send(cfg); }
-                    Err(e) => eprintln!("SIGHUP: failed to reload config: {:?}", e),
-                }
+                match State::load_state() {
+                    Ok(state) => {
+                        let _ = config_tx.send(state.config);
+                        let _ = rules_tx.send(state.rules);
+                    }
+                    Err(e) => {
+                        eprintln!("SIGHUP: failed to reload state: {:?}", e);
+                    }
+                };
             }
         }
     }
@@ -102,6 +109,7 @@ fn spawn_writer_task(
     mut writer: AuditLogWriter,
     mut receiver: mpsc::Receiver<AuditEvent>,
     mut config_rx: watch::Receiver<AuditConfig>,
+    mut rules_rx: watch::Receiver<Rules>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
@@ -117,6 +125,10 @@ fn spawn_writer_task(
                     if let Err(e) = writer.reload_config(&cfg) {
                         eprintln!("Failed to apply config reload: {:?}", e);
                     }
+                }
+                Ok(()) = rules_rx.changed() => {
+                    let rules = rules_rx.borrow_and_update().clone();
+                    writer.reload_rules(&rules);
                 }
             }
         }
