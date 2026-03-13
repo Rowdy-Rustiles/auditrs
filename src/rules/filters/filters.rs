@@ -1,10 +1,3 @@
-use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
-use crate::core::parser::audit_types::RecordType;
-use crate::rules::*;
-use crate::state::*;
-use crate::utils::{
-    RecordTypeAutoCompleter, StringListAutoCompleter, current_utc_string, strip_block_comments,
-};
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
@@ -14,6 +7,15 @@ use std::path::Path;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use toml;
+
+use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
+use crate::core::parser::audit_types::RecordType;
+use crate::rules::{AuditFilter, Filters, FilterAction};
+use crate::state::State;
+use crate::utils::{
+    RecordTypeAutoCompleter, StringListAutoCompleter, current_utc_string, strip_block_comments,
+};
+
 
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for

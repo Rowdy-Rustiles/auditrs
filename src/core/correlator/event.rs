@@ -1,7 +1,8 @@
 use std::fmt;
 
-use super::AuditEvent;
+use crate::core::correlator::AuditEvent;
 use crate::utils::systemtime_to_utc_string;
+
 
 impl fmt::Debug for AuditEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

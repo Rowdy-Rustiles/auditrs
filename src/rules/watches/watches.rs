@@ -2,13 +2,6 @@
 //! auditctl command as well as the logic behind how auditrs stores and manages
 //! watches.
 
-use crate::config::*;
-use crate::rules::{AuditWatch, WatchAction, Watches};
-use crate::state::*;
-use crate::utils::{
-    FilePathCompleter, StringListAutoCompleter, capitalize_first_letter, current_utc_string,
-    strip_block_comments,
-};
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, formatter::StringFormatter, validator::Validation};
 use inquire::{MultiSelect, Select};
@@ -22,6 +15,15 @@ use strum::EnumString;
 use strum::IntoEnumIterator;
 use tokio::sync::watch;
 use toml;
+
+use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
+use crate::rules::{AuditWatch, WatchAction, Watches, execute_watch_auditctl_command};
+use crate::state::State;
+use crate::utils::{
+    FilePathCompleter, StringListAutoCompleter, capitalize_first_letter, current_utc_string,
+    strip_block_comments,
+};
+
 
 /// Implementation of the `Watches` struct. Defines the non-interactive
 /// functionaity for referencing watches as state.

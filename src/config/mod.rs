@@ -12,16 +12,14 @@
 //! Rule-specific behavior (filters and watches) lives in the `rules` module;
 //! this `config` module focuses only on structural daemon settings.
 
-pub mod auditctl;
 pub mod config;
 
 pub use config::{get_config, load_config, set_config};
-// TODO: a lot of the logic between filters and watches is the same, we might
-// want to consider refactoring and consolidating some of their functions.
-// For now, duplication is ok
-use crate::rules::Rules;
-pub use auditctl::{execute_auditctl_command, execute_watch_auditctl_command};
+
 use serde::Deserialize;
+
+use crate::rules::Rules;
+
 
 /// The minimum log size for the auditrs daemon.
 pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB

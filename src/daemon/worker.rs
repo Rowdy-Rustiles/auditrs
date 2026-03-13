@@ -14,6 +14,7 @@ use crate::core::{
 use crate::daemon::daemon;
 use crate::state::{AuditConfig, Rules, State};
 
+
 /// Launches the auditrs daemons' component threads
 pub async fn run_worker() -> Result<()> {
     // We watch to see if the config and rules files change; on reload, we

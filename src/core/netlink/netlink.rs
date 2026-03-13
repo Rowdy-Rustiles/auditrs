@@ -1,9 +1,11 @@
-use super::{NetlinkAuditTransport, RawAuditRecord};
 use anyhow::{Context, Result};
 use audit::packet::AuditMessage;
 use futures::stream::StreamExt;
 use netlink_packet_core::NetlinkPayload;
 use tokio::sync::mpsc;
+
+use crate::core::netlink::{NetlinkAuditTransport, RawAuditRecord};
+
 
 impl NetlinkAuditTransport {
     pub fn new() -> Self {

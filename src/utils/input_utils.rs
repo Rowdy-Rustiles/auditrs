@@ -1,4 +1,3 @@
-use crate::core::parser::audit_types::RecordType;
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use inquire::{
@@ -8,6 +7,9 @@ use inquire::{
 };
 use std::io::ErrorKind;
 use strum::IntoEnumIterator;
+
+use crate::core::parser::audit_types::RecordType;
+
 
 /// Autocompleter for a fixed list of strings (e.g. existing filter record types
 /// from config).

@@ -1,10 +1,12 @@
 //! Top-level functions for controlling the state of the auditrs daemon.
 
-use super::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 use anyhow::{Context, Result};
 use colorized::*;
 use std::fs;
 use std::path::PathBuf;
+
+use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
+
 
 /// Starts the auditrs daemon.
 pub fn start_auditrs(reboot: bool) -> Result<()> {

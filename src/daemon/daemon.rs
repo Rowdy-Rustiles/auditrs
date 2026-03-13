@@ -1,15 +1,16 @@
-use super::worker::run_worker;
+//! Functions for daemonizing auditrs and managing the PID file.
+//! In the future, some work should be done to see if we can get this
+//! working with systemctl or similar system services
+
 use anyhow::{Context, Result, anyhow};
-/// Functions for daemonizing auditrs and managing the PID file.
-/// In the future, some work should be done to see if we can get this
-/// working with systemctl or similar system services
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::process::{Command, exit};
+use daemonize::{Daemonize, Outcome};
 
+use crate::daemon::worker::run_worker;
 use crate::daemon::PID_FILE_NAME;
 
-use daemonize::{Daemonize, Outcome};
 
 /// Creates a daemon process that runs in the background.
 /// Both the parent (main) and child (daemon) will return up the call stack with

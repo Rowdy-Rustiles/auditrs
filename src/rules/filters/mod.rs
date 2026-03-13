@@ -1,11 +1,12 @@
-use serde::Deserialize;
-
 mod filters;
 
 pub use filters::{
     add_filter_interactive, dump_filters, get_filters, import_filters, load_filters,
     remove_filter_interactive, update_filter_interactive,
 };
+
+use serde::Deserialize;
+
 
 /// The set of actions that can be taken by filters.
 #[derive(

@@ -43,9 +43,10 @@
 mod correlator;
 mod event;
 
-use crate::core::parser::ParsedAuditRecord;
 use std::collections::HashMap;
 use std::time::{Instant, SystemTime};
+
+use crate::core::parser::ParsedAuditRecord;
 
 #[derive(Clone)]
 pub struct AuditEvent {
