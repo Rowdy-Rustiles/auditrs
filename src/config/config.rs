@@ -1,13 +1,15 @@
-use crate::config::{
-    AuditConfig, CONFIG_DIR, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS,
-    LogFormat, MINIMUM_JOURNAL_SIZE, MINIMUM_LOG_SIZE, MINIMUM_PRIMARY_SIZE, SetConfigVariables,
-};
-use crate::utils::capitalize_first_letter;
 use anyhow::{Context, Result, anyhow};
 use config::Config;
 use inquire::{Confirm, Select, Text, validator::Validation};
 use std::path::Path;
 use std::{fs, fs::OpenOptions, io::Write};
+
+use crate::config::{
+    AuditConfig, CONFIG_DIR, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS,
+    LogFormat, MINIMUM_JOURNAL_SIZE, MINIMUM_LOG_SIZE, MINIMUM_PRIMARY_SIZE, SetConfigVariables,
+};
+use crate::utils::capitalize_first_letter;
+
 
 impl std::str::FromStr for LogFormat {
     type Err = String;

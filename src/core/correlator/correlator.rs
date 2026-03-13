@@ -2,11 +2,10 @@ use std::collections::{HashMap, hash_map::Entry};
 use std::time::{Duration, Instant, SystemTime};
 
 use crate::core::parser::ParsedAuditRecord;
+use crate::core::correlator::Correlator;
 
-use super::Correlator;
 
 const TIMEOUT: Duration = Duration::from_secs(3);
-
 type Identifier = (SystemTime, u16);
 
 impl Correlator {

@@ -7,3 +7,6 @@
 
 pub mod cli;
 pub mod dispatcher;
+
+pub use cli::build_cli;
+pub use dispatcher::dispatch;

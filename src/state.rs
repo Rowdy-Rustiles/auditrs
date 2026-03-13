@@ -8,13 +8,14 @@
 //! - provides strongly-typed access to configuration and rules for higher
 //!   layers without leaking internal persistence details.
 
-use crate::config::*;
-use crate::rules::{Watches, load_filters, load_watches};
+// We re-export these so they can be used for typing when State is invoked
+pub use crate::config::{AuditConfig, load_config};
+pub use crate::rules::Rules;
+
 use anyhow::{Context, Result};
 
-// We re-export these so they can be used for typing when State is invoked
-pub use crate::config::AuditConfig;
-pub use crate::rules::Rules;
+use crate::rules::{Watches, load_filters, load_watches};
+
 
 /// An interface for exposing the current state of the auditrs configuration to
 /// the configuration manipulation functions.

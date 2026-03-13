@@ -12,6 +12,7 @@ use std::process::Command;
 
 use crate::rules::{AuditWatch, WatchAction};
 
+
 // TODO: to persist the auditctl rules between reboots, we need to add them to
 // /etc/audit/audit.rules, this should be done at the same time as the watches
 // are added to /etc/auditrs/rules.toml and auditctl.

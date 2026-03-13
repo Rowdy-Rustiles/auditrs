@@ -2,10 +2,12 @@
 
 mod writer;
 
-use crate::config::LogFormat;
-use crate::state::*;
 use std::fs::File;
 use std::path::PathBuf;
+
+use crate::config::LogFormat;
+use crate::state::*;
+
 
 const DEFAULT_ACTIVE_DIR: &str = "/var/log/auditrs/active";
 const DEFAULT_JOURNAL_DIR: &str = "/var/log/auditrs/journal";

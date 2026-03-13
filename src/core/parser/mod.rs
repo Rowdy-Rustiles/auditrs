@@ -3,6 +3,7 @@ pub mod parser;
 
 pub use audit_types::RecordType;
 
+
 /// Intermediate result of parsing an audit message; used by parser and
 /// parsed_record. This should be phased out
 #[derive(Debug)]
