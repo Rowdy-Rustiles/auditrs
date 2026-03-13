@@ -1,5 +1,12 @@
-//! Module implementing the State struct. Specifically provides the state
-//! loading function.
+//! Shared state aggregation for the `auditrs` daemon and CLI.
+//!
+//! This module defines the `State` type, which bundles together the current
+//! core configuration and rule set:
+//! - wraps `config` and `rules` loading into a single `load_state` entry point;
+//! - exposes a convenient read-only snapshot used by CLI commands and the
+//!   daemon worker to avoid redundant disk I/O;
+//! - provides strongly-typed access to configuration and rules for higher
+//!   layers without leaking internal persistence details.
 
 use crate::config::*;
 use crate::rules::{Watches, load_filters, load_watches};

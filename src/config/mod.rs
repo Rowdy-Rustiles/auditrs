@@ -1,16 +1,16 @@
-//! Top level configuration module for auditrs. Internally, the config module is
-//! split into the core configuration, `config.rs`, and the rules configuration,
-//! which jointly defines the set of filters and watches used by auditrs.
-//! Changes to the core configuration effect structural aspects of the daemon,
-//! such as log directories and file sizes. Configuring rules occurs in the
-//! `filters.rs` and `watches.rs` modules, which are more outward-facing
-//! intefaces that impact the write path of audit events.
+//! Top-level configuration module for `auditrs`.
 //!
-//! Adjustments to rules occurs via the `auditrs filter` and `auditrs watch`
-//! commands, which are subsequently tied to logic in `config/filters/` and
-//! `config/watches/` submodules, respectively. Adjustments to the core
-//! configuration occurs via the `auditrs config` command, which is tied to
-//! logic in the top-level files within `config/`.
+//! This module is responsible for **core daemon configuration**, such as
+//! log directories, file sizes, and output formats. It provides:
+//! - Types that model the on-disk configuration (`AuditConfig`, enums for
+//!   readable `get`/`set` operations).
+//! - Constants describing configuration paths and defaults (e.g. `CONFIG_DIR`,
+//!   `CONFIG_FILE`, minimum sizes).
+//! - Functions for reading, validating, and persisting configuration via the
+//!   `auditrs config` CLI commands.
+//!
+//! Rule-specific behavior (filters and watches) lives in the `rules` module;
+//! this `config` module focuses only on structural daemon settings.
 
 pub mod auditctl;
 pub mod config;
