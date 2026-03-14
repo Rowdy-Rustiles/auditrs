@@ -1,14 +1,18 @@
 mod watches;
 
 pub use watches::{
-    add_watch_interactive, dump_watches, get_watches, import_watches, load_watches,
-    remove_watch_interactive, update_watch_interactive,
+    add_watch_interactive,
+    dump_watches,
+    get_watches,
+    import_watches,
+    load_watches,
+    remove_watch_interactive,
+    update_watch_interactive,
 };
 
-use std::path::PathBuf;
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
-
+use std::path::PathBuf;
 
 /// The set of actions that can be taken by filters.
 #[derive(

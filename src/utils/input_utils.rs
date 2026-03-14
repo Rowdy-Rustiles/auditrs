@@ -1,7 +1,8 @@
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use inquire::{
-    CustomUserError, Text,
+    CustomUserError,
+    Text,
     autocompletion::{Autocomplete, Replacement},
     validator::{StringValidator, Validation},
 };
@@ -9,7 +10,6 @@ use std::io::ErrorKind;
 use strum::IntoEnumIterator;
 
 use crate::core::parser::audit_types::RecordType;
-
 
 /// Autocompleter for a fixed list of strings (e.g. existing filter record types
 /// from config).

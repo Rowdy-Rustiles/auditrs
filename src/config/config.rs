@@ -5,11 +5,19 @@ use std::path::Path;
 use std::{fs, fs::OpenOptions, io::Write};
 
 use crate::config::{
-    AuditConfig, CONFIG_DIR, CONFIG_FILE, DEFAULT_CONFIG, GetConfigVariables, LOG_FORMATS,
-    LogFormat, MINIMUM_JOURNAL_SIZE, MINIMUM_LOG_SIZE, MINIMUM_PRIMARY_SIZE, SetConfigVariables,
+    AuditConfig,
+    CONFIG_DIR,
+    CONFIG_FILE,
+    DEFAULT_CONFIG,
+    GetConfigVariables,
+    LOG_FORMATS,
+    LogFormat,
+    MINIMUM_JOURNAL_SIZE,
+    MINIMUM_LOG_SIZE,
+    MINIMUM_PRIMARY_SIZE,
+    SetConfigVariables,
 };
 use crate::utils::capitalize_first_letter;
-
 
 impl std::str::FromStr for LogFormat {
     type Err = String;
@@ -88,10 +96,12 @@ impl AuditConfig {
                         // Enforce minimum log size (8 KB)
                         match input.parse::<usize>() {
                             Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
-                            Ok(size) if size < MINIMUM_LOG_SIZE => Ok(Validation::Invalid(
-                                format!("Log size must be at least {} bytes", MINIMUM_LOG_SIZE)
-                                    .into(),
-                            )),
+                            Ok(size) if size < MINIMUM_LOG_SIZE => {
+                                Ok(Validation::Invalid(
+                                    format!("Log size must be at least {} bytes", MINIMUM_LOG_SIZE)
+                                        .into(),
+                                ))
+                            }
                             Ok(_) => Ok(Validation::Valid),
                         }
                     })
@@ -103,16 +113,20 @@ impl AuditConfig {
                 let current_size = config.journal_size;
                 let journal_size = Text::new("Enter a new journal size (in logs):")
                     .with_help_message(&format!("Current journal size: {} logs", current_size))
-                    .with_validator(|input: &str| match input.parse::<usize>() {
-                        Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
-                        Ok(size) if size < MINIMUM_JOURNAL_SIZE => Ok(Validation::Invalid(
-                            format!(
-                                "Journal size must be at least {} logs",
-                                MINIMUM_JOURNAL_SIZE
-                            )
-                            .into(),
-                        )),
-                        Ok(_) => Ok(Validation::Valid),
+                    .with_validator(|input: &str| {
+                        match input.parse::<usize>() {
+                            Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
+                            Ok(size) if size < MINIMUM_JOURNAL_SIZE => {
+                                Ok(Validation::Invalid(
+                                    format!(
+                                        "Journal size must be at least {} logs",
+                                        MINIMUM_JOURNAL_SIZE
+                                    )
+                                    .into(),
+                                ))
+                            }
+                            Ok(_) => Ok(Validation::Valid),
+                        }
                     })
                     .prompt()?
                     .parse::<usize>()?;
@@ -125,16 +139,20 @@ impl AuditConfig {
                 let current_size = config.primary_size;
                 let primary_size = Text::new("Enter a new primary size (in bytes):")
                     .with_help_message(&format!("Current primary size: {} bytes", current_size))
-                    .with_validator(|input: &str| match input.parse::<usize>() {
-                        Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
-                        Ok(size) if size < MINIMUM_PRIMARY_SIZE => Ok(Validation::Invalid(
-                            format!(
-                                "Primary size must be at least {} bytes",
-                                MINIMUM_PRIMARY_SIZE
-                            )
-                            .into(),
-                        )),
-                        Ok(_) => Ok(Validation::Valid),
+                    .with_validator(|input: &str| {
+                        match input.parse::<usize>() {
+                            Err(e) => Ok(Validation::Invalid(format!("{}", e).into())),
+                            Ok(size) if size < MINIMUM_PRIMARY_SIZE => {
+                                Ok(Validation::Invalid(
+                                    format!(
+                                        "Primary size must be at least {} bytes",
+                                        MINIMUM_PRIMARY_SIZE
+                                    )
+                                    .into(),
+                                ))
+                            }
+                            Ok(_) => Ok(Validation::Valid),
+                        }
                     })
                     .prompt()?
                     .parse::<usize>()?;
@@ -177,10 +195,12 @@ impl AuditConfig {
             Some(GetConfigVariables::LogSize) => println!("{} bytes", config.log_size),
             Some(GetConfigVariables::JournalSize) => println!("{} logs", config.journal_size),
             Some(GetConfigVariables::PrimarySize) => println!("{} bytes", config.primary_size),
-            Some(GetConfigVariables::LogFormat) => println!(
-                "{}",
-                capitalize_first_letter(&config.log_format.to_string())
-            ),
+            Some(GetConfigVariables::LogFormat) => {
+                println!(
+                    "{}",
+                    capitalize_first_letter(&config.log_format.to_string())
+                )
+            }
             None => println!("{}", config.to_string()),
         }
         Ok(())

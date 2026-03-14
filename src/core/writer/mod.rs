@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use crate::config::LogFormat;
 use crate::state::*;
 
-
 const DEFAULT_ACTIVE_DIR: &str = "/var/log/auditrs/active";
 const DEFAULT_JOURNAL_DIR: &str = "/var/log/auditrs/journal";
 const DEFAULT_PRIMARY_DIR: &str = "/var/log/auditrs/primary";

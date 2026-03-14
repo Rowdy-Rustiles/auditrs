@@ -16,7 +16,6 @@ use anyhow::{Context, Result};
 
 use crate::rules::{Watches, load_filters, load_watches};
 
-
 /// An interface for exposing the current state of the auditrs configuration to
 /// the configuration manipulation functions.
 #[derive(Debug)]

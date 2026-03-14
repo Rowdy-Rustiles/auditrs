@@ -20,7 +20,6 @@ use serde::Deserialize;
 
 use crate::rules::Rules;
 
-
 /// The minimum log size for the auditrs daemon.
 pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
 /// The minimum journal size for the auditrs daemon.

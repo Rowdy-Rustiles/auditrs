@@ -6,13 +6,29 @@
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 
-use crate::config::{GetConfigVariables, SetConfigVariables, set_config, get_config};
+use crate::config::{GetConfigVariables, SetConfigVariables, get_config, set_config};
 use crate::daemon::control::{
-    reboot_auditrs, reload_auditrs, start_auditrs, status_auditrs, stop_auditrs,
+    reboot_auditrs,
+    reload_auditrs,
+    start_auditrs,
+    status_auditrs,
+    stop_auditrs,
 };
-use crate::rules::{add_filter_interactive, add_watch_interactive, dump_filters, dump_watches, get_filters, get_watches, import_filters, import_watches, remove_filter_interactive, remove_watch_interactive, update_filter_interactive, update_watch_interactive};
+use crate::rules::{
+    add_filter_interactive,
+    add_watch_interactive,
+    dump_filters,
+    dump_watches,
+    get_filters,
+    get_watches,
+    import_filters,
+    import_watches,
+    remove_filter_interactive,
+    remove_watch_interactive,
+    update_filter_interactive,
+    update_watch_interactive,
+};
 use crate::state::State;
-
 
 /// Top-level entry point for handling CLI subcommands
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {

@@ -138,11 +138,13 @@ fn test_source_log_lines_are_interpretable_as_netlink_audit_messages() {
         let bytes = hex_decode(&line).expect("valid hex");
         match NetlinkMessage::<AuditMessage>::deserialize(&bytes) {
             Ok(_msg) => deserialized_count += 1,
-            Err(e) => panic!(
-                "line {} failed to deserialize as NetlinkMessage<AuditMessage>: {}",
-                i + 1,
-                e
-            ),
+            Err(e) => {
+                panic!(
+                    "line {} failed to deserialize as NetlinkMessage<AuditMessage>: {}",
+                    i + 1,
+                    e
+                )
+            }
         }
     }
     assert!(

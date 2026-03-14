@@ -7,10 +7,13 @@ use std::os::unix::fs::DirEntryExt;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 
-use crate::core::{correlator::AuditEvent, writer::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary}};
 use crate::config::{AuditConfig, LogFormat};
-use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtime_to_utc_string};
+use crate::core::{
+    correlator::AuditEvent,
+    writer::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary},
+};
 use crate::state::{Rules, State};
+use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtime_to_utc_string};
 
 // TODO: this whole module needs to be closely looked over, a lot of IO is
 // happening here and we want to make sure its not wasting resources.

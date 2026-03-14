@@ -6,7 +6,6 @@ use tokio::sync::mpsc;
 
 use crate::core::netlink::{NetlinkAuditTransport, RawAuditRecord};
 
-
 impl NetlinkAuditTransport {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel(1000);

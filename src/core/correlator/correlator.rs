@@ -1,9 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::core::parser::ParsedAuditRecord;
 use crate::core::correlator::Correlator;
-
+use crate::core::parser::ParsedAuditRecord;
 
 const TIMEOUT: Duration = Duration::from_secs(3);
 type Identifier = (SystemTime, u16);
@@ -53,11 +52,13 @@ impl Correlator {
                     .remove(&id)
                     .map(|(records, _)| (id, records))
             })
-            .map(|(id, records)| super::AuditEvent {
-                timestamp: id.0,
-                serial: id.1,
-                record_count: records.len() as u16,
-                records,
+            .map(|(id, records)| {
+                super::AuditEvent {
+                    timestamp: id.0,
+                    serial: id.1,
+                    record_count: records.len() as u16,
+                    records,
+                }
             })
             .collect()
     }

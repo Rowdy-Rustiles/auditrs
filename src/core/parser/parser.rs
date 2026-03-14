@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::time::SystemTime;
 use nom::Finish;
 use nom::{
     IResult,
@@ -7,11 +5,12 @@ use nom::{
     character::complete::{char, space1},
     sequence::tuple,
 };
+use std::collections::HashMap;
+use std::time::SystemTime;
 
-use crate::core::parser::{ParsedAuditRecord, RecordData};
 use crate::core::netlink::RawAuditRecord;
+use crate::core::parser::{ParsedAuditRecord, RecordData};
 use crate::utils::timestamp_string_to_systemtime;
-
 
 impl ParsedAuditRecord {
     /// Returns (timestamp, serial) identifying the audit event this record

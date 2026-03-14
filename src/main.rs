@@ -3,7 +3,6 @@ use anyhow::Result;
 
 use auditrs::cli::{build_cli, dispatcher};
 
-
 fn main() -> Result<()> {
     if std::env::consts::OS != "linux" {
         println!("auditRS is only supported on Linux");

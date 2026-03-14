@@ -10,12 +10,14 @@ use toml;
 
 use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
 use crate::core::parser::audit_types::RecordType;
-use crate::rules::{AuditFilter, Filters, FilterAction};
+use crate::rules::{AuditFilter, FilterAction, Filters};
 use crate::state::State;
 use crate::utils::{
-    RecordTypeAutoCompleter, StringListAutoCompleter, current_utc_string, strip_block_comments,
+    RecordTypeAutoCompleter,
+    StringListAutoCompleter,
+    current_utc_string,
+    strip_block_comments,
 };
-
 
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for

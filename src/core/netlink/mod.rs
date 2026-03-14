@@ -19,7 +19,6 @@
 mod netlink;
 mod raw_record;
 
-
 #[derive(Debug, PartialEq)]
 pub struct RawAuditRecord {
     pub record_id: u16,

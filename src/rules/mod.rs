@@ -9,16 +9,15 @@
 //! A `Rules` value combines both `Filters` and `Watches` and is used by the
 //! daemon state to enforce the current rule set.
 
+pub mod auditctl;
 pub mod filters;
 pub mod watches;
-pub mod auditctl;
 
+pub use auditctl::{execute_auditctl_command, execute_watch_auditctl_command};
 pub use filters::*;
 pub use watches::*;
-pub use auditctl::{execute_auditctl_command, execute_watch_auditctl_command};
 
 use serde::Deserialize;
-
 
 /// Audit rules are collections of filters and watches that are applied to
 /// audit events before they can be written to the primary log.

@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 
-
 /// Starts the auditrs daemon.
 pub fn start_auditrs(reboot: bool) -> Result<()> {
     if is_running()? {

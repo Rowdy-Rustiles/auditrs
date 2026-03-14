@@ -20,10 +20,12 @@ use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
 use crate::rules::{AuditWatch, WatchAction, Watches, execute_watch_auditctl_command};
 use crate::state::State;
 use crate::utils::{
-    FilePathCompleter, StringListAutoCompleter, capitalize_first_letter, current_utc_string,
+    FilePathCompleter,
+    StringListAutoCompleter,
+    capitalize_first_letter,
+    current_utc_string,
     strip_block_comments,
 };
-
 
 /// Implementation of the `Watches` struct. Defines the non-interactive
 /// functionaity for referencing watches as state.
@@ -66,40 +68,41 @@ impl Watches {
         // Gracefully handle rules files that do not yet contain a `watches`
         // section (for example, a freshly created file that only has filters).
         let watches_vec = match root.get("watches").and_then(|v| v.as_array()) {
-            Some(arr) => arr
-                .iter()
-                .filter_map(|v| v.as_table())
-                .filter_map(|table| {
-                    let path = table.get("path")?.as_str()?.to_string();
+            Some(arr) => {
+                arr.iter()
+                    .filter_map(|v| v.as_table())
+                    .filter_map(|table| {
+                        let path = table.get("path")?.as_str()?.to_string();
 
-                    let actions: Vec<WatchAction> =
-                        table.get("actions").and_then(|v| v.as_array()).map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str())
-                                .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
-                                .collect::<Vec<_>>()
-                        })?;
+                        let actions: Vec<WatchAction> =
+                            table.get("actions").and_then(|v| v.as_array()).map(|arr| {
+                                arr.iter()
+                                    .filter_map(|v| v.as_str())
+                                    .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
+                                    .collect::<Vec<_>>()
+                            })?;
 
-                    if actions.is_empty() {
-                        return None;
-                    }
+                        if actions.is_empty() {
+                            return None;
+                        }
 
-                    let recursive = table.get("recursive").and_then(|v| v.as_bool())?;
+                        let recursive = table.get("recursive").and_then(|v| v.as_bool())?;
 
-                    let path_buf = PathBuf::from(&path);
-                    let key = table
-                        .get("key")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())?;
+                        let path_buf = PathBuf::from(&path);
+                        let key = table
+                            .get("key")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())?;
 
-                    Some(AuditWatch {
-                        path: path_buf,
-                        actions,
-                        recursive,
-                        key,
+                        Some(AuditWatch {
+                            path: path_buf,
+                            actions,
+                            recursive,
+                            key,
+                        })
                     })
-                })
-                .collect(),
+                    .collect()
+            }
             None => Vec::new(),
         };
 
@@ -550,11 +553,12 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditWatch>> {
         };
 
         let actions: Vec<WatchAction> = match table.get("actions").and_then(|v| v.as_array()) {
-            Some(arr) => arr
-                .iter()
-                .filter_map(|v| v.as_str())
-                .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
-                .collect(),
+            Some(arr) => {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .filter_map(|s| WatchAction::from_str(&s.to_lowercase()).ok())
+                    .collect()
+            }
             None => {
                 eprintln!(
                     "warning: {}: missing 'actions' array field, skipping",

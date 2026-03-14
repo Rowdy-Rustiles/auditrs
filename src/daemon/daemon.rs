@@ -3,14 +3,13 @@
 //! working with systemctl or similar system services
 
 use anyhow::{Context, Result, anyhow};
+use daemonize::{Daemonize, Outcome};
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::process::{Command, exit};
-use daemonize::{Daemonize, Outcome};
 
-use crate::daemon::worker::run_worker;
 use crate::daemon::PID_FILE_NAME;
-
+use crate::daemon::worker::run_worker;
 
 /// Creates a daemon process that runs in the background.
 /// Both the parent (main) and child (daemon) will return up the call stack with
