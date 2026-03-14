@@ -13,11 +13,13 @@ pub mod auditctl;
 pub mod filters;
 pub mod watches;
 
-pub use auditctl::{execute_auditctl_command, execute_watch_auditctl_command};
+pub use auditctl::execute_watch_auditctl_command;
 pub use filters::*;
 pub use watches::*;
 
 use serde::Deserialize;
+
+const AUDIT_RULES_FILE: &str = "/etc/audit/audit.rules";
 
 /// Audit rules are collections of filters and watches that are applied to
 /// audit events before they can be written to the primary log.

@@ -1,3 +1,18 @@
+//! System for filtering audit record outputs to the primary log.
+//!
+//! Implementation of the `filters` subcommand for manipulating the output to
+//! the primary log. The functions defined here are exposed via the command
+//! `auditrs filter` and provide standard CRUD operations as well as
+//! import/export functionality. Filters are stored alongside watches
+//! at `/etc/auditrs/rules.toml`.
+//!
+//! Unlike watches, filters do not interact with the kernel to control record
+//! emission. Instead, filters are applied to audit events that fall under a
+//! watch after they are written to the active and journal logs but before they
+//! are written to a primary log. Therefore, it is possible that the an
+//! audit event's uniquely identifying audit record(s) are absent from the
+//! output to the primary log.
+
 mod filters;
 
 pub use filters::{

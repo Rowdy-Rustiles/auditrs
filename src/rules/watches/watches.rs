@@ -1,6 +1,4 @@
-//! Module defining auditrs's watch feature. This is a wrapper around the
-//! auditctl command as well as the logic behind how auditrs stores and manages
-//! watches.
+//! Implementation of the `Watches` struct and associated functions.
 
 use anyhow::{Context, Result, anyhow};
 use inquire::{Confirm, formatter::StringFormatter, validator::Validation};

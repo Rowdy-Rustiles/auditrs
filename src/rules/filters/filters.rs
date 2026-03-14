@@ -1,3 +1,5 @@
+//! Implementation of the `Filters` struct and associated functions.
+
 use anyhow::{Context, Result, anyhow};
 use inquire::Select;
 use inquire::{formatter::StringFormatter, validator::Validation};
@@ -19,6 +21,8 @@ use crate::utils::{
     strip_block_comments,
 };
 
+/// Implementation of the `Filters` struct. Defines the non-interactive
+/// functionality for referencing filters as state.
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for
     /// autocomplete).
@@ -31,7 +35,8 @@ impl Filters {
         &self.0
     }
 
-    /// Load filters from the dedicated filters file.
+    /// Load filters from the dedicated rules file defined in the config
+    /// (default: `/etc/auditrs/rules.toml`).
     pub fn load() -> Result<Filters> {
         let file_path = RULES_FILE;
 
@@ -77,6 +82,13 @@ pub fn load_filters() -> Result<Filters> {
     Filters::load()
 }
 
+/// Persist the provided filters into the shared rules file (`rules.toml`),
+/// while preserving other top-level sections such as `watches`.
+///
+/// **Parameters:**
+///
+/// * `filters`: Slice of `AuditFilter`s that should become the authoritative
+///   `filters` section in the rules file.
 fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
     let file_path = RULES_FILE;
     // Create a default config folder at /etc/auditrs if it doesn't exist
@@ -126,6 +138,14 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
     Ok(())
 }
 
+/// Insert or update a single filter in the rules file.
+///
+/// If a filter with the same `record_type` already exists, its `action` is
+/// replaced; otherwise a new filter entry is appended.
+///
+/// **Parameters:**
+///
+/// * `filter`: The `AuditFilter` to upsert into the current filter set.
 fn set_filter(filter: AuditFilter) -> Result<()> {
     let mut current = load_filters()?;
     // Replace or append.
@@ -142,6 +162,12 @@ fn set_filter(filter: AuditFilter) -> Result<()> {
     persist_filters(&current.0)
 }
 
+/// Remove any filters whose `record_type` matches the provided record type
+/// (case-insensitive) and persist the result.
+///
+/// **Parameters:**
+///
+/// * `record_type`: Record type identifier to remove filters for.
 fn remove_filter(record_type: &str) -> Result<()> {
     let mut current = load_filters()?;
     current
@@ -150,7 +176,11 @@ fn remove_filter(record_type: &str) -> Result<()> {
     persist_filters(&current.0)
 }
 
-/// Gets all filters from the filters file using the pre-loaded state.
+/// Print all filters from the rules file using the pre-loaded shared state.
+///
+/// **Parameters:**
+///
+/// * `state`: Shared application `State` containing preloaded `Filters`.
 pub fn get_filters(state: &State) -> Result<()> {
     let filters = state.rules.filters.as_slice();
     if filters.is_empty() {
@@ -165,6 +195,14 @@ pub fn get_filters(state: &State) -> Result<()> {
 }
 
 /// Add a single filter via interactive prompts.
+///
+/// The user is prompted for a valid audit record type and a filter action, and
+/// the resulting `AuditFilter` is persisted into the rules file.
+///
+/// **Parameters:**
+///
+/// * `_state`: Currently unused, included for symmetry with other interactive
+///   commands that may need shared state.
 pub fn add_filter_interactive(_state: &State) -> Result<()> {
     let record_type = inquire::Text::new("Enter a record type to filter on:")
         .with_autocomplete(RecordTypeAutoCompleter::default())
@@ -206,6 +244,13 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
 
 /// Remove a filter via interactive prompt with fuzzy autocomplete over existing
 /// filters only.
+///
+/// The user selects a `record_type` from currently configured filters and the
+/// corresponding filter entry is removed from the rules file.
+///
+/// **Parameters:**
+///
+/// * `state`: Shared application `State` used to obtain existing `Filters`.
 pub fn remove_filter_interactive(state: &State) -> Result<()> {
     let existing = state.rules.filters.record_types();
     if existing.is_empty() {
@@ -237,6 +282,13 @@ pub fn remove_filter_interactive(state: &State) -> Result<()> {
 
 /// Update an existing filter's action via interactive prompt; record type
 /// chosen from current filters only.
+///
+/// The user selects an existing `record_type` and a new action; the matching
+/// filter is then updated in the rules file.
+///
+/// **Parameters:**
+///
+/// * `state`: Shared application `State` used to obtain and update `Filters`.
 pub fn update_filter_interactive(state: &State) -> Result<()> {
     let existing = state.rules.filters.record_types();
     if existing.is_empty() {
@@ -278,6 +330,15 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
     set_filter(filter)
 }
 
+/// Validate raw filter fields and construct an `AuditFilter`.
+///
+/// **Parameters:**
+///
+/// * `record_type`: Raw record type string; validated against known
+///   `RecordType` variants.
+/// * `action`: Raw filter action string; validated as a `FilterAction`.
+/// * `location`: Human-readable identifier (file name, line, or index) used in
+///   error messages for diagnostics.
 fn validate_and_build_filter(
     record_type: &str,
     action: &str,
@@ -315,6 +376,12 @@ fn validate_and_build_filter(
     })
 }
 
+/// Import filters from a TOML rules file into `AuditFilter` values.
+///
+/// **Parameters:**
+///
+/// * `content`: Raw TOML file content.
+/// * `path`: Filesystem path to the TOML file, used in diagnostics.
 fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     let cleaned = strip_block_comments(content);
     let root: toml::Value = toml::from_str(&cleaned)
@@ -373,8 +440,14 @@ fn import_from_toml(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     Ok(filters)
 }
 
-/// Import filters from an external and load them into filters.toml (used in
-/// `auditrs import <file>` command)
+/// Import filters from an external `.ars` file and convert them into
+/// `AuditFilter` values (used internally by the `auditrs filter import <file>`
+/// command).
+///
+/// **Parameters:**
+///
+/// * `content`: Raw `.ars` file content.
+/// * `path`: Filesystem path to the `.ars` file, used in diagnostics.
 fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     let cleaned = strip_block_comments(content);
     let reader = std::io::BufReader::new(cleaned.as_bytes());
@@ -410,7 +483,12 @@ fn import_from_ars(content: &str, path: &Path) -> Result<Vec<AuditFilter>> {
     Ok(filters)
 }
 
-/// Import filters from an external file (.toml or .ars format).
+/// Import filters from an external file (`.toml` or `.ars` format) and persist
+/// them into the main rules file.
+///
+/// **Parameters:**
+///
+/// * `file`: Path to the filter definition file to import.
 pub fn import_filters(file: &str) -> Result<()> {
     let path = Path::new(file);
     if !path.exists() {
@@ -451,6 +529,13 @@ pub fn import_filters(file: &str) -> Result<()> {
     Ok(())
 }
 
+/// Dump the currently configured filters into an external file in either TOML
+/// or ARS format, preserving a generated header.
+///
+/// **Parameters:**
+///
+/// * `file`: Base path (with or without extension) to write the dump to.
+/// * `state`: Shared application `State` containing the `Filters` to dump.
 pub fn dump_filters(file: &str, state: &State) -> Result<()> {
     let filters = state.rules.filters.as_slice();
     if filters.is_empty() {
@@ -491,6 +576,12 @@ pub fn dump_filters(file: &str, state: &State) -> Result<()> {
     Ok(())
 }
 
+/// Serialize the provided filters into TOML text containing a top-level
+/// `[[filters]]` array.
+///
+/// **Parameters:**
+///
+/// * `filters`: Slice of `AuditFilter`s to serialize.
 fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
     let mut table = toml::map::Map::new();
     table.insert(
@@ -516,6 +607,11 @@ fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
     Ok(toml::to_string_pretty(&toml::Value::Table(table))?)
 }
 
+/// Serialize the provided filters into the `.ars` line-based text format.
+///
+/// **Parameters:**
+///
+/// * `filters`: Slice of `AuditFilter`s to serialize.
 fn to_ars_format(filters: &[AuditFilter]) -> Result<String> {
     let mut content = String::new();
     for filter in filters {
