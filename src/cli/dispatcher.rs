@@ -3,6 +3,10 @@
 //! This module contains the top-level `dispatch` function that matches CLI
 //! subcommands and delegates to handler functions.
 
+// TODO: There a couple of different function dispatch patterns (my bad) used
+// within the dispatch/handle functions. We should aim to eventually unify these
+// patterns into a consistent dispatch scheme.
+
 use anyhow::{Context, Result};
 use clap::ArgMatches;
 
@@ -31,6 +35,10 @@ use crate::rules::{
 use crate::state::State;
 
 /// Top-level entry point for handling CLI subcommands
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument to match a handling function to
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     let state = State::load_state()?;
     match matches.subcommand() {
@@ -53,20 +61,44 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-/// Tools subcommands, to be moved to /tools when written
-
+/// Dumps the contents of a selected auditrs log to a specified path.
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument to match a handling function. Subcommands and
+///   flags of the argument can be used for further options.
 fn handle_dump(_matches: &ArgMatches) -> Result<()> {
     todo!()
 }
 
+/// Searches auditrs logs for a supplied term or pattern.
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument to match a handling function. Subcommands and
+///   flags of the argument can be used for further options
 fn handle_search(_matches: &ArgMatches) -> Result<()> {
     todo!()
 }
 
+/// Generates a report on the audit logs with statistical analysis of their
+/// contents
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument to match a handling function. Subcommands and
+///   flags of the argument can be used for further options
 fn handle_report(_matches: &ArgMatches) -> Result<()> {
     todo!()
 }
 
+/// Dispatch of config handling commands. Config getters are directly addressed
+/// in this function. Config setters are further propagated to the
+/// `handle_config_set()` function.
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument for getting/settings.
 fn handle_config(matches: &ArgMatches) -> Result<()> {
     match matches.subcommand() {
         Some(("get", get_m)) => {
@@ -87,6 +119,12 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
     }
 }
 
+/// Prepares the proper function call to `set_config()` based on the supplied
+/// CLI arguments.
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument for the config option being set.
 fn handle_config_set(matches: &ArgMatches) -> Result<()> {
     let result = match matches.subcommand() {
         Some(("format", _m)) => set_config(SetConfigVariables::LogFormat),
@@ -126,6 +164,13 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
     result
 }
 
+/// Dispatch of filter commands to their respective handler functions.
+/// Dynamically reloads the auditrs daemon if necessary.
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument to match a handling function. Subcommands and
+///   flags of the argument can be used for further options
 fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_filters(state),
@@ -170,6 +215,13 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
     }
 }
 
+/// Dispatch of watches commands to their respective handler functions.
+/// Dynamically reloads the auditrs daemon if necessary.
+///
+/// **Parameters:**
+///
+/// * `matches`: CLI argument to match a handling function. Subcommands and
+///   flags of the argument can be used for further options
 fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_watches(state),
