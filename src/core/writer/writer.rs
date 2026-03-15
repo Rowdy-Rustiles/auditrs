@@ -122,7 +122,7 @@ impl AuditLogWriter {
     /// Writes an `AuditEvent` using the legacy audit log format.
     ///
     /// The output takes the form:
-    /// ```
+    /// ```ignore
     /// type=... msg=audit(<timestamp>:<serial>) key1=val1 key2=val2 ...
     /// ```
     ///
@@ -160,7 +160,7 @@ impl AuditLogWriter {
     /// Writes an `AuditEvent` using the "simple" format.
     ///
     /// The output takes the form:
-    /// ```
+    /// ```ignore
     /// [UTC timestamp][Record Count: <number of records>][Audit Event Group <serial>]:
     ///     Record: <record type> <record data>
     ///     ...
