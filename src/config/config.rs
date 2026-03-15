@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result, anyhow};
 use config::Config;
-use inquire::{Confirm, Select, Text, validator::Validation};
+use inquire::{Select, Text, validator::Validation};
 use std::path::Path;
 use std::{fs, fs::OpenOptions, io::Write};
 

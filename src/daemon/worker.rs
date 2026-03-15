@@ -11,7 +11,6 @@ use crate::core::{
     parser::ParsedAuditRecord,
     writer::AuditLogWriter,
 };
-use crate::daemon::daemon;
 use crate::state::{AuditConfig, Rules, State};
 
 /// Launches the auditrs daemons' component threads

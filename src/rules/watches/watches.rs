@@ -1,7 +1,7 @@
 //! Implementation of the `Watches` struct and associated functions.
 
 use anyhow::{Context, Result, anyhow};
-use inquire::{Confirm, formatter::StringFormatter, validator::Validation};
+use inquire::{Confirm, validator::Validation};
 use inquire::{MultiSelect, Select};
 use std::collections::hash_map::DefaultHasher;
 use std::fs;
@@ -9,9 +9,7 @@ use std::hash::{Hash, Hasher};
 use std::io::BufRead;
 use std::path::{Path, PathBuf, absolute};
 use std::str::FromStr;
-use strum::EnumString;
 use strum::IntoEnumIterator;
-use tokio::sync::watch;
 use toml;
 
 use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
@@ -203,7 +201,7 @@ fn set_watch(watch: AuditWatch) -> Result<()> {
 
 /// Add a single watch via interactive prompts.
 pub fn add_watch_interactive() -> Result<()> {
-    let mut watch_path_str = inquire::Text::new("Enter a file or directory path to watch:")
+    let watch_path_str = inquire::Text::new("Enter a file or directory path to watch:")
         .with_autocomplete(FilePathCompleter::default())
         .with_validator(|input: &str| {
             if Path::new(input).exists() {

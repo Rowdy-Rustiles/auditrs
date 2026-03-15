@@ -2,9 +2,7 @@ use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use inquire::{
     CustomUserError,
-    Text,
     autocompletion::{Autocomplete, Replacement},
-    validator::{StringValidator, Validation},
 };
 use std::io::ErrorKind;
 use strum::IntoEnumIterator;

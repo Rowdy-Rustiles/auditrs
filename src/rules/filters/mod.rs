@@ -76,6 +76,8 @@ pub struct Filters(pub(crate) Vec<AuditFilter>);
 /// type coupled with the action to be taken on it.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuditFilter {
+    /// The record type to filter.
     pub record_type: String,
+    /// The action to take on the record type.
     pub action: FilterAction,
 }

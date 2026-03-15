@@ -5,7 +5,6 @@
 //! event will occur atomically; the stream may have interleaved records from
 //! different events.
 
-
 mod correlator;
 mod event;
 
@@ -14,7 +13,8 @@ use std::time::{Instant, SystemTime};
 
 use crate::core::parser::ParsedAuditRecord;
 
-/// A single audit event: one or more records sharing the same (timestamp, serial).
+/// A single audit event: one or more records sharing the same (timestamp,
+/// serial).
 #[derive(Clone)]
 pub struct AuditEvent {
     /// Event timestamp from the audit stream.

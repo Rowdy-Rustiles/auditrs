@@ -18,8 +18,6 @@ pub use config::{get_config, load_config, set_config};
 
 use serde::Deserialize;
 
-use crate::rules::Rules;
-
 /// The minimum log size for the auditrs daemon.
 pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
 /// The minimum journal size for the auditrs daemon.
@@ -104,11 +102,20 @@ pub enum GetConfigVariables {
 #[derive(Debug, Deserialize)]
 pub enum SetConfigVariables {
     /// Set the log directory for the auditrs daemon.
-    LogDirectory { value: String },
+    LogDirectory {
+        /// The new log directory path.
+        value: String,
+    },
     /// Set the journal directory for the auditrs daemon.
-    JournalDirectory { value: String },
+    JournalDirectory {
+        /// The new journal directory path.
+        value: String,
+    },
     /// Set the primary directory for the auditrs daemon.
-    PrimaryDirectory { value: String },
+    PrimaryDirectory {
+        /// The new primary directory path.
+        value: String,
+    },
     /// Set the log size for the auditrs daemon.
     LogSize,
     /// Set the journal size for the auditrs daemon.
