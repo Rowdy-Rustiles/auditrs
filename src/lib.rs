@@ -28,7 +28,7 @@
 //!   formats, and tools where possible, while also allowing for modern
 //!   improvements.
 
-#![warn(missing_docs, unused_attributes, unused_imports, unused_variables)]
+#![warn(missing_docs, unused_attributes)]
 pub mod cli;
 pub mod config;
 pub mod core;

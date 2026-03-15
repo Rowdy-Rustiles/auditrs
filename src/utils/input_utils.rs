@@ -1,3 +1,18 @@
+//! Helpers for building interactive CLI autocompleters.
+//!
+//! This module provides small wrapper types that implement `inquire`'s
+//! `Autocomplete` trait for several common use cases:
+//!
+//! - **`StringListAutoCompleter`**: fuzzy autocomplete over a fixed list of
+//!   strings (e.g. existing filter record types).
+//! - **`RecordTypeAutoCompleter`**: autocomplete for kernel audit record types
+//!   backed by the `RecordType` enum.
+//! - **`FilePathCompleter`**: filesystem-aware autocomplete for paths with
+//!   fuzzy matching.
+
+// TODO: This module could be consolidated into a single autocompleter struct/trait implementation.
+// Essentially the only thing that differentiates the autocompleters is the type of data they are autocompleting.
+
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use inquire::{
@@ -13,18 +28,31 @@ use crate::core::parser::audit_types::RecordType;
 /// from config).
 #[derive(Clone)]
 pub struct StringListAutoCompleter {
-    input: String,
+    /// The current input.
+    _input: String,
+    /// The options to autocomplete.
     options: Vec<String>,
 }
 
 impl StringListAutoCompleter {
+    /// Construct a new `StringListAutoCompleter` from a list of options.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `options`: Vector of strings that will be offered as autocomplete
+    ///   suggestions.
     pub fn new(options: Vec<String>) -> Self {
         Self {
-            input: String::new(),
+            _input: String::new(),
             options,
         }
     }
 
+    /// Return the candidate options sorted by fuzzy match score.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `input`: The current user input used to rank the options.
     fn fuzzy_sort(&self, input: &str) -> Vec<(String, i64)> {
         let matcher = SkimMatcherV2::default().smart_case();
         let mut matches: Vec<(String, i64)> = self
@@ -42,11 +70,16 @@ impl StringListAutoCompleter {
 }
 
 impl Autocomplete for StringListAutoCompleter {
+    /// Return up to 25 fuzzy-matched suggestions from the fixed option list.
     fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, CustomUserError> {
         let matches = self.fuzzy_sort(input);
         Ok(matches.into_iter().take(25).map(|(s, _)| s).collect())
     }
 
+    /// Resolve the final completion value for the current input.
+    ///
+    /// If a `highlighted_suggestion` is present, it is used as the completion;
+    /// otherwise the best fuzzy match for `input` is chosen.
     fn get_completion(
         &mut self,
         input: &str,
@@ -64,7 +97,10 @@ impl Autocomplete for StringListAutoCompleter {
     }
 }
 
-/// Not sure if this should be hoisted up to ./mod.rs or left here
+/// Autocompleter for `RecordType`, backed by the `RecordType` enum.
+///
+/// This type keeps an internal cache of record types for the last input to
+/// avoid recomputing on each keystroke.
 #[derive(Clone, Default)]
 pub struct RecordTypeAutoCompleter {
     input: String,
@@ -72,6 +108,11 @@ pub struct RecordTypeAutoCompleter {
 }
 
 impl RecordTypeAutoCompleter {
+    /// Refresh the internal cache of record types when the input changes.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `input`: The current user input used to constrain the cache.
     fn update_input(&mut self, input: &str) -> Result<(), CustomUserError> {
         if input == self.input && !self.record_types.is_empty() {
             return Ok(());
@@ -87,6 +128,11 @@ impl RecordTypeAutoCompleter {
         Ok(())
     }
 
+    /// Return matching record types sorted by fuzzy score for the given input.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `input`: The current user input used to rank `RecordType` variants.
     fn fuzzy_sort(&self, input: &str) -> Vec<(String, i64)> {
         let mut matches: Vec<(String, i64)> = self
             .record_types
@@ -105,6 +151,7 @@ impl RecordTypeAutoCompleter {
 }
 
 impl Autocomplete for RecordTypeAutoCompleter {
+    /// Provide up to 25 `RecordType` suggestions matching the input.
     fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, CustomUserError> {
         self.update_input(input)?;
 
@@ -116,6 +163,10 @@ impl Autocomplete for RecordTypeAutoCompleter {
             .collect())
     }
 
+    /// Resolve the final completion value for a record type.
+    ///
+    /// If a `highlighted_suggestion` is present, it is used; otherwise, the
+    /// highest-scoring fuzzy match for `input` is returned.
     fn get_completion(
         &mut self,
         input: &str,
@@ -135,13 +186,25 @@ impl Autocomplete for RecordTypeAutoCompleter {
     }
 }
 
+/// Autocompleter for filesystem paths.
 #[derive(Clone, Default)]
 pub struct FilePathCompleter {
+    /// The current input.
     input: String,
+    /// The filesystem paths.
     paths: Vec<String>,
 }
 
 impl FilePathCompleter {
+    /// Refresh the internal list of filesystem paths for a given input prefix.
+    ///
+    /// This function attempts to read the directory implied by the current
+    /// input (or its parent) and caches the discovered entries for later
+    /// fuzzy matching.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `input`: Raw user input representing a partial path.
     fn update_input(&mut self, input: &str) -> Result<(), CustomUserError> {
         if input == self.input && !self.paths.is_empty() {
             return Ok(());
@@ -190,6 +253,11 @@ impl FilePathCompleter {
         Ok(())
     }
 
+    /// Return cached filesystem paths sorted by fuzzy match score.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `input`: The current user input used to rank cached path entries.
     fn fuzzy_sort(&self, input: &str) -> Vec<(String, i64)> {
         let mut matches: Vec<(String, i64)> = self
             .paths
@@ -208,6 +276,7 @@ impl FilePathCompleter {
 }
 
 impl Autocomplete for FilePathCompleter {
+    /// Provide up to 15 filesystem path suggestions matching the input.
     fn get_suggestions(&mut self, input: &str) -> Result<Vec<String>, CustomUserError> {
         self.update_input(input)?;
 
@@ -215,6 +284,10 @@ impl Autocomplete for FilePathCompleter {
         Ok(matches.into_iter().take(15).map(|(path, _)| path).collect())
     }
 
+    /// Resolve the final completion value for a filesystem path.
+    ///
+    /// If a `highlighted_suggestion` is present, it is used; otherwise, the
+    /// best fuzzy match for `input` is returned.
     fn get_completion(
         &mut self,
         input: &str,

@@ -23,7 +23,7 @@ use crate::core::{
     writer::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary},
 };
 use crate::state::{Rules, State};
-use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtime_to_utc_string};
+use crate::utils::{current_utc_string, systemtime_to_timestamp_string};
 
 // TODO: this whole module needs to be closely looked over, a lot of IO is
 // happening here and we want to make sure its not wasting resources.

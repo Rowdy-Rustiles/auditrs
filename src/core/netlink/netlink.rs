@@ -25,7 +25,7 @@ impl NetlinkAuditTransport {
     }
 
     /// Receives a raw audit record from the kernel via netlink.
-    async fn recv(&mut self) -> Option<RawAuditRecord> {
+    async fn _recv(&mut self) -> Option<RawAuditRecord> {
         self.receiver.recv().await
     }
 }
@@ -40,7 +40,7 @@ impl NetlinkAuditTransport {
 async fn netlink_listener_task(sender: mpsc::Sender<RawAuditRecord>) -> Result<()> {
     // Create netlink socket connection
     let (connection, mut handle, mut messages) =
-        audit::new_connection().context(("Netlink socket connection failed."))?;
+        audit::new_connection().context("Netlink socket connection failed.")?;
 
     // Spawn connection task
     tokio::spawn(connection);
