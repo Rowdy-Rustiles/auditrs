@@ -1,3 +1,5 @@
+//! Implementation of the configuration module
+
 use anyhow::{Context, Result, anyhow};
 use config::Config;
 use inquire::{Confirm, Select, Text, validator::Validation};
@@ -19,18 +21,26 @@ use crate::config::{
 };
 use crate::utils::capitalize_first_letter;
 
+/// Used to user-facing display of the current log format, usually from CLI
+/// setters and the config file, to a `LogFormat` enum variant.
 impl std::str::FromStr for LogFormat {
     type Err = String;
+    /// Implements `from_str` for `LogFormat`.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `s`: The string to match a `LogFormat` enum variant to.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "legacy" => Ok(LogFormat::Legacy),
             "simple" => Ok(LogFormat::Simple),
             "json" => Ok(LogFormat::Json),
-            _ => Err(format!("unknown format: {}", s)),
+            _ => Err(format!("Unknown format: {}", s)),
         }
     }
 }
 
+/// Implementation block for `AuditConfig`.
 impl AuditConfig {
     // TODO: it would be nice if we could automatically resolve missing config key
     // errors
