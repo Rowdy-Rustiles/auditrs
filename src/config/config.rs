@@ -21,15 +21,14 @@ use crate::config::{
 };
 use crate::utils::capitalize_first_letter;
 
-/// Used to user-facing display of the current log format, usually from CLI
-/// setters and the config file, to a `LogFormat` enum variant.
+/// Parse a user-facing log format string (e.g. from CLI or config file) into a
+/// `LogFormat` variant.
+///
+/// **Parameters:**
+///
+/// * `s`: The string to match to a `LogFormat` variant (case-insensitive).
 impl std::str::FromStr for LogFormat {
     type Err = String;
-    /// Implements `from_str` for `LogFormat`.
-    ///
-    /// **Parameters:**
-    ///
-    /// * `s`: The string to match a `LogFormat` enum variant to.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "legacy" => Ok(LogFormat::Legacy),
@@ -40,11 +39,13 @@ impl std::str::FromStr for LogFormat {
     }
 }
 
-/// Implementation block for `AuditConfig`.
+/// Implementation of `AuditConfig`. Load, persist, and query the auditrs
+/// configuration.
 impl AuditConfig {
     // TODO: it would be nice if we could automatically resolve missing config key
     // errors
-    /// Load the auditrs configuration from the config file.
+    /// Load the auditrs configuration from the config file. Creates the config
+    /// file with defaults if it does not exist.
     pub fn load_config() -> Result<AuditConfig> {
         if !Path::new(CONFIG_FILE).exists() {
             eprintln!("Config file not found at {CONFIG_FILE}, creating default");
@@ -72,13 +73,20 @@ impl AuditConfig {
         Ok(settings)
     }
 
+    /// Update a single config variable (directory, size, or format) and persist
+    /// to the config file. For size and format, prompts interactively via
+    /// inquire; for directories, the value is taken from the variant.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `key`: The config variable to set and its value (if not interactive).
+    ///
     /// TODO: decide if we want to use inquire for input or directly handle CLI
-    /// arguments For the set directory command, we can use the CLI
-    /// arguments directly since most terminals have autocompletions for
-    /// paths. But for the set size and format commands, we use inquire,
-    /// would we want unify this?
+    /// arguments. For the set directory command we use CLI arguments (terminals
+    /// have path autocompletion); for set size and format we use inquire —
+    /// unify?
     pub fn set_config(key: SetConfigVariables) -> Result<()> {
-        // Config is loaded for the help messages, it could probably be removed later
+        // Config is loaded for the help messages; could be removed later.
         let config = load_config()?;
         let content = std::fs::read_to_string(CONFIG_FILE)?;
         let mut root: toml::Table = toml::from_str(&content)?;
@@ -188,6 +196,7 @@ impl AuditConfig {
                 );
             }
         }
+        // Persist the updated [settings] table back to the config file.
         let write_result = std::fs::write(CONFIG_FILE, toml::to_string_pretty(&root)?);
 
         write_result
@@ -195,7 +204,12 @@ impl AuditConfig {
             .inspect(|_| println!("Config successfully saved to {}", CONFIG_FILE))
     }
 
-    /// Print config values (used by `config get`).
+    /// Print one or all config values to stdout (used by `config get`).
+    ///
+    /// **Parameters:**
+    ///
+    /// * `key`: Which variable to print, or `None` to print the full config
+    ///   summary.
     pub fn get_config(key: Option<GetConfigVariables>) -> Result<()> {
         let config = load_config()?;
         match key {
@@ -217,20 +231,32 @@ impl AuditConfig {
     }
 }
 
-/// Convenience free functions re-exported from the `config` module.
+/// Load the auditrs configuration; delegates to `AuditConfig::load_config`.
 pub fn load_config() -> Result<AuditConfig> {
     AuditConfig::load_config()
 }
 
+/// Update a single config variable and persist to the config file.
+///
+/// **Parameters:**
+///
+/// * `key`: The config variable to set (and value for directory keys).
 pub fn set_config(key: SetConfigVariables) -> Result<()> {
     AuditConfig::set_config(key)
 }
 
+/// Print one or all config values to stdout.
+///
+/// **Parameters:**
+///
+/// * `key`: Which variable to print, or `None` for the full config summary.
 pub fn get_config(key: Option<GetConfigVariables>) -> Result<()> {
     AuditConfig::get_config(key)
 }
 
+/// Extension methods for `LogFormat` (display and file naming).
 impl LogFormat {
+    /// Return the lowercase format name used in config and CLI.
     pub fn to_string(&self) -> String {
         match self {
             LogFormat::Legacy => "legacy".to_string(),
@@ -239,9 +265,8 @@ impl LogFormat {
         }
     }
 
-    /// Get the extension for the log file based on the log format
-    /// Each log format has a unique extension for easier identification and
-    /// parsing.
+    /// Return the file extension for this log format (e.g. `log`, `slog`,
+    /// `json`).
     pub fn get_extension(&self) -> String {
         match self {
             LogFormat::Legacy => "log".to_string(),
@@ -252,6 +277,8 @@ impl LogFormat {
 }
 
 impl AuditConfig {
+    /// Return a human-readable summary of all settings (used by `config get`
+    /// with no key).
     pub fn to_string(&self) -> String {
         format!(
             "Log format: {}\nLog directory: {}\nJournal directory: {}\nPrimary directory: {}\nLog size: {} bytes\nJournal size: {} logs\nPrimary size: {} bytes",
