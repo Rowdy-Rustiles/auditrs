@@ -8,12 +8,6 @@ use std::path::PathBuf;
 use crate::config::LogFormat;
 use crate::state::*;
 
-const DEFAULT_ACTIVE_DIR: &str = "/var/log/auditrs/active";
-const DEFAULT_JOURNAL_DIR: &str = "/var/log/auditrs/journal";
-const DEFAULT_PRIMARY_DIR: &str = "/var/log/auditrs/primary";
-const DEFAULT_LOG_FORMAT: LogFormat = LogFormat::Simple;
-const DEFAULT_LOG_SIZE: usize = 6 * 1024 * 1024; // 6 MB
-
 /// Main writer for audit logs, handles writing to the active log, journal, and
 /// primary store. The audit log writer is responsible for managing log
 /// rotations, enforcing log size limits, and handling long term log storage.

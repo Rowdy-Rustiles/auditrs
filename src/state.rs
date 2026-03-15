@@ -14,7 +14,7 @@ pub use crate::rules::Rules;
 
 use anyhow::{Context, Result};
 
-use crate::rules::{Watches, load_filters, load_watches};
+use crate::rules::{load_filters, load_watches};
 
 /// An interface for exposing the current state of the auditrs configuration to
 /// the configuration manipulation functions.
@@ -33,6 +33,8 @@ pub struct State {
 /// unnecessary file I/O. The state interface also generally provides a more
 /// convenient interface for accessing the config state.
 impl State {
+    /// Loads the state of the auditrs daemon from the configuration and rules
+    /// files.
     pub fn load_state() -> Result<State> {
         let config = load_config().context("Could not load config")?;
         let filters = load_filters().context("Could not load filters")?;

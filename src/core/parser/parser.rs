@@ -7,7 +7,9 @@
 //! for the trailing key–value section.
 
 use nom::{
-    IResult, Parser, Finish,
+    Finish,
+    IResult,
+    Parser,
     bytes::complete::{tag, take_while1},
     character::complete::{char, space1},
 };
@@ -46,11 +48,13 @@ impl TryFrom<RawAuditRecord> for ParsedAuditRecord {
     fn try_from(raw_record: RawAuditRecord) -> Result<Self, Self::Error> {
         parse_audit_message(&raw_record.data)
             .finish()
-            .map(|(_, record_data)| ParsedAuditRecord {
-                record_type: raw_record.record_id.into(),
-                timestamp: record_data.timestamp,
-                serial: record_data.serial.parse::<u16>().unwrap_or(0),
-                fields: record_data.fields,
+            .map(|(_, record_data)| {
+                ParsedAuditRecord {
+                    record_type: raw_record.record_id.into(),
+                    timestamp: record_data.timestamp,
+                    serial: record_data.serial.parse::<u16>().unwrap_or(0),
+                    fields: record_data.fields,
+                }
             })
             .map_err(|e| anyhow::anyhow!("Failed to parse audit message: {:?}", e))
     }
@@ -82,7 +86,8 @@ fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
         serial_digits,
         char(')'),
         char(':'),
-    ).parse(input)?; // does not parse the trailing ' '.
+    )
+        .parse(input)?; // does not parse the trailing ' '.
 
     // Now parse the rest of the line as key-value pairs
     // Brute implementation: put everything into a single "kv" field.

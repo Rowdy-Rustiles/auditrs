@@ -1,13 +1,25 @@
-//! Top-level functions for controlling the state of the auditrs daemon.
+//! Top-level functions for controlling the lifecycle of the `auditrs` daemon.
+//!
+//! Exposes a small set of convenience functions that are used by
+//! the CLI to start, stop, reboot, and reload the running daemon process. Each
+//! function wraps lower-level primitives from `crate::daemon::daemon` and adds
+//! user-friendly status output suitable for terminal use.
 
 use anyhow::{Context, Result};
 use colorized::*;
-use std::fs;
-use std::path::PathBuf;
 
 use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 
-/// Starts the auditrs daemon.
+/// Starts the `auditrs` daemon if it is not already running.
+///
+/// When invoked while a daemon instance is already active, this function
+/// is a no-op and returns `Ok(())` after printing a short status message.
+///
+/// **Parameters:**
+///
+/// * `reboot`: Indicates whether this start is part of a reboot sequence. When
+///   `true`, success messages intended for interactive users are suppressed so
+///   that reboot flows remain quiet.
 pub fn start_auditrs(reboot: bool) -> Result<()> {
     if is_running()? {
         colorize_println("Daemon is already running", Colors::BrightGreenFg);
@@ -21,7 +33,15 @@ pub fn start_auditrs(reboot: bool) -> Result<()> {
     Ok(())
 }
 
-/// Stops the auditrs daemon.
+/// Stops the running `auditrs` daemon, if present.
+///
+/// If no daemon is currently running, this function simply prints a status
+/// message and returns `Ok(())`.
+///
+/// **Parameters:**
+///
+/// * `reboot`: Indicates whether this stop is part of a reboot sequence. When
+///   `true`, the usual "stopped" message is not printed.
 pub fn stop_auditrs(reboot: bool) -> Result<()> {
     if !is_running()? {
         colorize_println("Daemon is already stopped", Colors::BrightRedFg);
@@ -35,9 +55,12 @@ pub fn stop_auditrs(reboot: bool) -> Result<()> {
     Ok(())
 }
 
-/// Reboot the auditrs daemon, this constitutes a full restart of the daemon.
-/// The config is reloaded after the daemon is started up again. This is not
-/// a dynamic reload of the config; for config reloads, use `reload_auditrs`.
+/// Performs a full reboot of the `auditrs` daemon.
+///
+/// This is implemented as a stop followed by a fresh start of the daemon
+/// process. Configuration is reloaded as part of the restart sequence.
+/// For a dynamic, in-place configuration reload without a full restart,
+/// prefer `reload_auditrs`.
 pub fn reboot_auditrs() -> Result<()> {
     // If the daemon is not running, we don't need to reboot
     if !is_running()? {
@@ -50,6 +73,10 @@ pub fn reboot_auditrs() -> Result<()> {
     Ok(())
 }
 
+/// Reports whether the `auditrs` daemon is currently running.
+///
+/// Prints a human-friendly message to standard output indicating the
+/// daemon's status, and always returns `Ok(())` regardless of state.
 pub fn status_auditrs() -> Result<()> {
     if is_running()? {
         colorize_println("Auditrs is running", Colors::BrightGreenFg);
@@ -59,9 +86,11 @@ pub fn status_auditrs() -> Result<()> {
     Ok(())
 }
 
-/// Ask the running daemon to reload config (SIGHUP). This is a dynamic action
-/// that will immediately apply new configuration to the auditrs daemon while it
-/// is running.
+/// Asks the running daemon to reload its configuration (SIGHUP).
+///
+/// This sends `SIGHUP` to the daemon process identified by the stored PID,
+/// causing it to re-read configuration without a full restart. If the daemon
+/// is not running, this function is a no-op and returns `Ok(())`.
 pub fn reload_auditrs() -> Result<()> {
     if !is_running()? {
         return Ok(());

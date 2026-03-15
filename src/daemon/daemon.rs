@@ -1,6 +1,18 @@
-//! Functions for daemonizing auditrs and managing the PID file.
-//! In the future, some work should be done to see if we can get this
-//! working with systemctl or similar system services
+//! Functions for daemonizing `auditrs` and managing the PID file.
+//!
+//! This module encapsulates the low-level mechanics of running `auditrs` as a
+//! background daemon process. It is responsible for:
+//!
+//! - **Process lifecycle**: forking into the background, wiring up
+//!   stdout/stderr, and driving the main worker loop.
+//! - **PID management**: creating, locating, reading, and cleaning up the PID
+//!   file that identifies the running daemon.
+//! - **Environment preparation**: ensuring that the legacy `auditd` service is
+//!   disabled before `auditrs` starts.
+//!
+//! In the future, this behavior may be integrated with `systemd` or other
+//! service managers, but for now it uses a traditional double-fork style
+//! daemonization via the `daemonize` crate.
 
 use anyhow::{Context, Result, anyhow};
 use daemonize::{Daemonize, Outcome};
@@ -11,10 +23,17 @@ use std::process::Command;
 use crate::daemon::PID_FILE_NAME;
 use crate::daemon::worker::run_worker;
 
-/// Creates a daemon process that runs in the background.
-/// Both the parent (main) and child (daemon) will return up the call stack with
-/// a result. The parent process will wait a moment and check if the daemon's
-/// PID file exists.
+/// Starts the `auditrs` daemon as a background process.
+///
+/// This function:
+///
+/// - Verifies that the caller has root privileges.
+/// - Prepares the environment by disabling the legacy `auditd` service.
+/// - Forks into a background daemon using the `daemonize` crate.
+/// - In the parent process, briefly waits and then checks that the PID file
+///   exists to confirm successful startup.
+/// - In the child process, runs the asynchronous worker loop and ensures the
+///   PID file is cleaned up on exit via `FileGuard`.
 pub fn start_daemon() -> Result<()> {
     is_root()?;
     prepare_auditrs().context("Could not stop auditd service with systemctl")?;
@@ -66,7 +85,10 @@ pub fn start_daemon() -> Result<()> {
     }
 }
 
-/// Send SIGTERM to the daemon (used by `auditrs stop`).
+/// Sends `SIGTERM` to the running daemon (used by `auditrs stop`).
+///
+/// This reads the PID from the daemon's PID file, validates it, and then
+/// forwards a `SIGTERM` signal to request a graceful shutdown.
 pub fn stop_daemon() -> Result<()> {
     is_root()?;
     let path = pid_file_path();
@@ -81,12 +103,18 @@ pub fn stop_daemon() -> Result<()> {
     Ok(())
 }
 
-/// True if the PID file exists and that process is still running.
+/// Returns `true` if the PID file exists and the referenced process is alive.
+///
+/// This is used by higher-level control functions to determine whether an
+/// `auditrs` daemon is currently active.
 pub fn is_running() -> Result<bool> {
     Ok(fs::exists(pid_file_path())? && unsafe { libc::kill(read_pid()?, 0) == 0 })
 }
 
-/// Read the PID from the daemon's PID file.
+/// Reads the PID from the daemon's PID file.
+///
+/// The PID file location is resolved via [`pid_file_path`], and the contents
+/// are parsed as a signed 32-bit integer.
 pub fn read_pid() -> Result<i32> {
     let path = pid_file_path();
     let contents = fs::read_to_string(&path).context("Could not read PID file")?;
@@ -96,9 +124,14 @@ pub fn read_pid() -> Result<i32> {
         .context(format!("Could not parse PID file contents: {contents}"))
 }
 
-/// Get the path to the daemon's PID file.
-/// Includes various fallbacks for different user permissions/environments.
-/// However, we should ensure that the commands are always run by the root user.
+/// Resolves the path to the daemon's PID file.
+///
+/// The resolution strategy is:
+///
+/// - If running as root (`geteuid() == 0`), use `/var/run/<PID_FILE_NAME>`.
+/// - Otherwise, prefer `$XDG_RUNTIME_DIR/<PID_FILE_NAME>` if set.
+/// - Next, fall back to `$HOME/.cache/auditrs/<PID_FILE_NAME>`.
+/// - Finally, use `./<PID_FILE_NAME>` as a last resort.
 pub fn pid_file_path() -> PathBuf {
     // Ideally this is the only block that runs.
     unsafe {
@@ -118,10 +151,14 @@ pub fn pid_file_path() -> PathBuf {
     PathBuf::from(".").join(PID_FILE_NAME)
 }
 
-/// Checks if the user is running with root privileges.
-/// Users without permissions will write to relative paths, we want to avoid
-/// this.
-/// TODO: Ideally we check if the user has write access to the log directory
+/// Ensures that the current user is running with root privileges.
+///
+/// This is used as a guard before operations that must not be performed by
+/// unprivileged users (such as starting or stopping the system daemon).
+/// Non-root callers receive an error.
+///
+/// TODO: Ideally we check whether the user has write access to the configured
+/// log directory instead of hard-requiring root.
 fn is_root() -> Result<()> {
     unsafe {
         if libc::geteuid() == 0 {
@@ -132,8 +169,15 @@ fn is_root() -> Result<()> {
     }
 }
 
-/// Ensures that auditd is no longer running.
-/// TODO: This definitely fails if auditctl or auditd aren't installed.
+/// Ensures that the legacy `auditd` service is no longer running.
+///
+/// This helper enables auditing via `auditctl -e 1` and then stops the
+/// `auditd` service, preparing the system for `auditrs` to take over. It is
+/// intentionally conservative and will error if the underlying shell command
+/// fails.
+///
+/// TODO: This will fail if either `auditctl` or `auditd` are not installed on
+/// the host system; we may want to detect and handle that case more gracefully.
 fn prepare_auditrs() -> Result<()> {
     Command::new("sh")
         .arg("-c")
@@ -143,9 +187,11 @@ fn prepare_auditrs() -> Result<()> {
     Ok(())
 }
 
-// This is a file guard that will wrap the daemon's pid file.
-// Once it falls out of scope (i.e., daemon exits), the Drop trait will make
-// sure the pid file gets deleted.
+/// Guard object that owns the daemon's PID file and cleans it up on drop.
+///
+/// When an instance of `FileGuard` goes out of scope (typically when the
+/// daemon exits), its `Drop` implementation removes the PID file so that
+/// subsequent invocations do not see a stale daemon state.
 struct FileGuard {
     path: PathBuf,
 }

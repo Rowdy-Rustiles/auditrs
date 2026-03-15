@@ -1,11 +1,21 @@
 //! Writer module implementation.
+//!
+//! This module is responsible for persisting correlated `AuditEvent`s to
+//! disk. It encapsulates the logic for:
+//!
+//! - **Active logs**: the currently open log file that receives new events.
+//! - **Journal rotation**: moving full active logs into a bounded journal
+//!   directory and pruning old entries.
+//! - **Primary logs**: optional, long-lived logs that receive a subset of
+//!   events (e.g. those matching configured watches).
+//! - **Dynamic reconfiguration**: reacting to changes in `AuditConfig` and
+//!   `Rules` so that directory paths, formats, and watch behavior can be
+//!   updated at runtime without restarting the daemon.
 
 use anyhow::Result;
 use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
-use std::os::unix::fs::DirEntryExt;
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
 use crate::config::{AuditConfig, LogFormat};
 use crate::core::{
@@ -18,6 +28,21 @@ use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtim
 // TODO: this whole module needs to be closely looked over, a lot of IO is
 // happening here and we want to make sure its not wasting resources.
 impl AuditLogWriter {
+    /// Constructs a new `AuditLogWriter` using the current application state.
+    ///
+    /// This function:
+    ///
+    /// - Loads `State` from disk to obtain the initial `AuditConfig`.
+    /// - Ensures that the configured active, journal, and primary directories
+    ///   exist, creating them if necessary.
+    /// - Opens (or creates) the active log file and initializes its size.
+    /// - Immediately checks whether the active log already exceeds the
+    ///   configured size limit and rotates it if needed.
+    ///
+    /// **Parameters:**
+    ///
+    /// This constructor does not take parameters; it always initializes from
+    /// the currently loaded `State`.
     pub fn new() -> anyhow::Result<Self> {
         let state = State::load_state()?;
         let config = &state.config;
@@ -65,6 +90,22 @@ impl AuditLogWriter {
         Ok(writer)
     }
 
+    /// Writes a single correlated `AuditEvent` to the active log (and
+    /// optionally to the primary log).
+    ///
+    /// The concrete output format is determined by `log_format`:
+    ///
+    /// - `LogFormat::Legacy`: legacy kernel-style log line.
+    /// - `LogFormat::Simple`: human-readable summary via `Display` on
+    ///   `AuditEvent`.
+    /// - `LogFormat::Json`: JSON representation (not yet implemented).
+    ///
+    /// After writing, this function also enforces the active log size limit,
+    /// rotating the file into the journal when necessary.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` to be written.
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
         let write_primary = self.check_watch_events(&event);
         match self.log_format {
@@ -78,6 +119,18 @@ impl AuditLogWriter {
         self.check_log_size()
     }
 
+    /// Writes an `AuditEvent` using the legacy audit log format.
+    ///
+    /// The output takes the form:
+    /// ```
+    /// type=... msg=audit(<timestamp>:<serial>) key1=val1 key2=val2 ...
+    /// ```
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The correlated `AuditEvent` to render.
+    /// * `write_primary`: When `true`, the same formatted line is also written
+    ///   to the primary log in addition to the active log.
     fn write_event_legacy(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
         let mut prefix: String = String::new();
         let mut fields: String = String::new();
@@ -104,6 +157,23 @@ impl AuditLogWriter {
         Ok(())
     }
 
+    /// Writes an `AuditEvent` using the "simple" format.
+    ///
+    /// The output takes the form:
+    /// ```
+    /// [UTC timestamp][Record Count: <number of records>][Audit Event Group <serial>]:
+    ///     Record: <record type> <record data>
+    ///     ...
+    ///     Record: <record type> <record data>
+    /// ```
+    /// This format delegates to the `Display` implementation of `AuditEvent`,
+    /// producing a concise, human-readable representation.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The event to format and write.
+    /// * `write_primary`: When `true`, also mirrors the simple-formatted event
+    ///   into the primary log.
     fn write_event_simple(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
         let event_str = format!("{}", event);
         writeln!(self.active.file_handle, "{}", event_str)?;
@@ -116,23 +186,41 @@ impl AuditLogWriter {
         Ok(())
     }
 
-    fn write_event_json(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
+    /// Writes an `AuditEvent` as JSON.
+    ///
+    /// This is a placeholder for a future JSON log format implementation.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The event to serialize as JSON.
+    /// * `write_primary`: When `true`, the JSON representation will also be
+    ///   written to the primary log.
+    fn write_event_json(&mut self, _event: AuditEvent, _write_primary: bool) -> Result<()> {
         todo!();
-        let timestamp = format!(
-            "\"timestamp\": \"{}\"",
-            systemtime_to_utc_string(event.timestamp)
-        );
-        let serial = format!("\"serial\": \"{}\"", event.serial);
+        // let timestamp = format!(
+        //     "\"timestamp\": \"{}\"",
+        //     systemtime_to_utc_string(event.timestamp)
+        // );
+        // let serial = format!("\"serial\": \"{}\"", event.serial);
 
-        let res = format!("");
-        writeln!(self.active.file_handle, "{}", res)?;
+        // let res = format!("");
+        // writeln!(self.active.file_handle, "{}", res)?;
 
-        if write_primary {
-            self.write_primary(res)?;
-        }
+        // if write_primary {
+        //     self.write_primary(res)?;
+        // }
 
-        Ok(())
+        // Ok(())
     }
+    /// Appends a single log line to the primary log.
+    ///
+    /// If no primary log file exists yet for the current configuration, this
+    /// function will create one with a timestamped name and track it in the
+    /// writer's `primary` state.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `line`: Fully formatted log line to be appended to the primary log.
     fn write_primary(&mut self, line: String) -> Result<()> {
         // Get the latest primary log path, creating one if it doesn't exist yet.
         let path: PathBuf = if let Some(last) = self.primary.paths.last() {
@@ -155,6 +243,13 @@ impl AuditLogWriter {
 
     /// Check if the audit event contains a record with a key identifier that
     /// matches a configured watch.
+    ///
+    /// This helper is used to decide whether an event should also be written
+    /// to the primary log, based on watch keys defined in the current `Rules`.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` being inspected for matching watch keys.
     fn check_watch_events(&self, event: &AuditEvent) -> bool {
         let watches = &self.state.rules.watches.0;
 
@@ -171,12 +266,15 @@ impl AuditLogWriter {
         false
     }
 
+    /// Returns the filesystem path of the current active log file.
     fn active_log_path(&self) -> PathBuf {
         self.active.path.clone()
     }
 
-    /// Check log size for log rotation. If the active log exceeds `log_size`,
-    /// rotate it into the journal and open a fresh active log file.
+    /// Check log size for log rotation.
+    ///
+    /// If the active log exceeds the configured `log_size`, this function
+    /// rotates it into the journal and opens a fresh active log file.
     fn check_log_size(&mut self) -> Result<()> {
         let active_log = self.active_log_path();
         let file_size = match std::fs::metadata(&active_log) {
@@ -195,6 +293,10 @@ impl AuditLogWriter {
     }
 
     /// Rotate the current active log into the journal.
+    ///
+    /// This moves the existing active log file into the journal directory,
+    /// tracks it in memory, and enforces the maximum number of journal files
+    /// by deleting the oldest when necessary.
     pub fn rotate_active_into_journal(&mut self) -> Result<()> {
         let active_path = self.active.path.clone();
         let ext = self.log_format.get_extension();
@@ -244,11 +346,15 @@ impl AuditLogWriter {
         Ok(())
     }
 
-    /// Reload writer settings from a new config
+    /// Reload writer settings from a new `AuditConfig`.
     ///
     /// If `log_format` or any directory changed, rotate the current active log
     /// into the journal so the old file stays coherent, then reopen a fresh
     /// active file using the new directory and extension.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `cfg`: The new `AuditConfig` to reload from.
     pub fn reload_config(&mut self, cfg: &AuditConfig) -> Result<()> {
         let old_format = self.log_format;
         let old_active_dir = self.active_directory.clone();

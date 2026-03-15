@@ -1,20 +1,17 @@
-/*
-    Definition of an Audit Record. This corresponds to a single line in an audit log file,
-    which may contain multiple fields. Original implementation uses key/value string pairs
-    stored in a HashMap, but could be extended to a more strongly typed structure in the
-    future.
-
-    Relevant documentation:
-    https://github.com/linux-audit/audit-documentation/blob/main/specs/fields/field-dictionary.csv
-
-    For information on the mapping of netlink messages to auditrs log types, refer to:
-    https://codebrowser.dev/linux/include/linux/audit.h.html#147
-
-    need to look into the types presented here:
-    https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/6/html/security_guide/sec-understanding_audit_log_files
-
-    and additionally find more modern types
-*/
+//! Defines the netlink transport for receiving raw audit records from the
+//! kernel.
+//!
+//! This module contains the `RawAuditRecord` struct, which is used to represent
+//! a single raw audit record received from the kernel. It also contains the
+//! `NetlinkAuditTransport` struct, which is used to transport the raw audit
+//! records to the parser.
+//!
+//! The `RawAuditRecord` struct is used to represent a single raw audit record
+//! received from the kernel. It contains the record ID and the data of the
+//! record.
+//!
+//! The `NetlinkAuditTransport` struct is used to transport the raw audit
+//! records to the parser.
 
 mod netlink;
 mod raw_record;

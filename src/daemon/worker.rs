@@ -1,3 +1,17 @@
+//! Asynchronous worker loop and background tasks for the `auditrs` daemon.
+//!
+//! This module wires together the core components of the daemon:
+//! the netlink transport, parser, correlator, and writer. It is
+//! responsible for:
+//!
+//! - **Launching tasks** that receive raw audit records, parse them into
+//!   structured records, correlate them into higher-level events, and persist
+//!   them to disk.
+//! - **Managing configuration and rules reloads** in response to `SIGHUP`,
+//!   propagating new values to interested components via `watch` channels.
+//! - **Handling shutdown signals** (`SIGTERM`, Ctrl‑C) and orchestrating a
+//!   graceful stop of background tasks.
+
 use anyhow::Result;
 use std::time::Duration;
 use tokio::signal;
@@ -13,7 +27,28 @@ use crate::core::{
 };
 use crate::state::{AuditConfig, Rules, State};
 
-/// Launches the auditrs daemons' component threads
+/// Launches the daemon's asynchronous worker tasks and drives signal handling.
+///
+/// The worker performs the following high-level steps:
+///
+/// - Loads initial `State` (configuration and rules) and exposes them on
+///   `watch` channels so that downstream components can react to updates.
+/// - Constructs the core pipeline components: `AuditLogWriter`,
+///   `NetlinkAuditTransport`, and `Correlator`.
+/// - Spawns three cooperative tasks:
+///   - a **parser task** that consumes `RawAuditRecord`s and produces
+///     `ParsedAuditRecord`s,
+///   - a **correlator task** that groups related records into `AuditEvent`s,
+///   - a **writer task** that persists events and reacts to config/rules
+///     changes.
+/// - Waits for termination signals (`SIGTERM`, `SIGHUP`, Ctrl‑C); on `SIGHUP`
+///   it reloads state and publishes new config/rules; on termination signals it
+///   aborts the background tasks and returns.
+///
+/// **Parameters:**
+///
+/// This function does not take any parameters; it is intended to be the
+/// top-level entry point for the daemon's asynchronous runtime.
 pub async fn run_worker() -> Result<()> {
     // We watch to see if the config and rules files change; on reload, we
     // send the new values into watch channels to propagate to the necessary
@@ -62,6 +97,25 @@ pub async fn run_worker() -> Result<()> {
     Ok(())
 }
 
+/// Spawns the background task responsible for parsing raw audit records.
+///
+/// This task:
+///
+/// - Receives `RawAuditRecord`s from the netlink transport.
+/// - Converts each record into a `ParsedAuditRecord` via
+///   `ParsedAuditRecord::try_from`.
+/// - Emits successfully parsed records on the provided `mpsc` channel for
+///   downstream correlation.
+/// - Logs parse errors but continues processing subsequent records.
+///
+/// **Parameters:**
+///
+/// * `receiver`: `mpsc::Receiver<RawAuditRecord>` from which raw records are
+///   pulled.
+/// * `sender`: `mpsc::Sender<ParsedAuditRecord>` used to forward successfully
+///   parsed records to the correlator stage.
+///
+/// The returned `JoinHandle` can be used to manage or cancel the task.
 fn spawn_parser_task(
     mut receiver: mpsc::Receiver<RawAuditRecord>,
     sender: mpsc::Sender<ParsedAuditRecord>,
@@ -85,6 +139,26 @@ fn spawn_parser_task(
     })
 }
 
+/// Spawns the correlator task that groups parsed records into audit events.
+///
+/// The correlator task:
+///
+/// - Listens for incoming `ParsedAuditRecord`s and pushes them into a
+///   `Correlator` instance.
+/// - Periodically (every 500ms) flushes expired or complete events from the
+///   correlator and forwards them on an `mpsc` channel to the writer.
+///
+/// This design ensures that events are written out in a timely fashion even if
+/// no new records are currently arriving.
+///
+/// **Parameters:**
+///
+/// * `correlator`: The `Correlator` instance responsible for grouping related
+///   audit records into higher-level `AuditEvent`s.
+/// * `receiver`: `mpsc::Receiver<ParsedAuditRecord>` that supplies parsed
+///   records to be correlated.
+/// * `sender`: `mpsc::Sender<AuditEvent>` used to publish completed or expired
+///   events to the writer stage.
 fn spawn_correlator_task(
     mut correlator: Correlator,
     mut receiver: mpsc::Receiver<ParsedAuditRecord>,
@@ -106,6 +180,30 @@ fn spawn_correlator_task(
     })
 }
 
+/// Spawns the writer task that persists correlated events and reacts to
+/// runtime configuration changes.
+///
+/// The writer task:
+///
+/// - Consumes `AuditEvent`s from an `mpsc` channel and writes them to the
+///   configured log outputs.
+/// - Listens for changes on the `config_rx` and `rules_rx` `watch` channels,
+///   applying updated configuration and rules to the `AuditLogWriter` as they
+///   arrive (typically triggered by `SIGHUP`).
+///
+/// The task runs until the event channel is closed, after which it exits
+/// cleanly.
+///
+/// **Parameters:**
+///
+/// * `writer`: The `AuditLogWriter` instance responsible for persisting
+///   `AuditEvent`s and applying configuration updates.
+/// * `receiver`: `mpsc::Receiver<AuditEvent>` from which correlated events are
+///   consumed.
+/// * `config_rx`: `watch::Receiver<AuditConfig>` that delivers live
+///   configuration updates.
+/// * `rules_rx`: `watch::Receiver<Rules>` that delivers live rule changes used
+///   by the writer.
 fn spawn_writer_task(
     mut writer: AuditLogWriter,
     mut receiver: mpsc::Receiver<AuditEvent>,
