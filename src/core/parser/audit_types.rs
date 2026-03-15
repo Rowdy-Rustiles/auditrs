@@ -1,3 +1,20 @@
+//! Defines various Rust representations of the different record types that can
+//! be emitted by the Linux audit subsystem. Helper functions are provided to
+//! convert a given record type between various forms (string, enum, record id,
+//! etc.).
+//!
+//! The record types present in the file were compiled from the following
+//! documentation:
+//!
+//! https://github.com/torvalds/linux/blob/master/include/uapi/linux/audit.h
+//! https://github.com/microsoft/OMS-Auditd-Plugin/blob/master/RecordType.h
+//! https://github.com/linux-audit/audit-userspace/blob/master/lib/audit-records.h
+//!
+//! Alternative documentation of the record types are available at:
+//!
+//! https://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md
+
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter, strum::EnumString)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecordType {
@@ -310,6 +327,8 @@ pub enum RecordType {
 }
 
 impl RecordType {
+    /// Returns the string representation of the record type as defined in the
+    /// auditd documentation.
     pub fn as_audit_str(&self) -> &'static str {
         match self {
             // Control
@@ -590,6 +609,11 @@ impl RecordType {
 }
 
 impl From<u16> for RecordType {
+    /// Converts a record ID to a `RecordType`.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `value`: The record ID.
     fn from(value: u16) -> Self {
         use RecordType::*;
 

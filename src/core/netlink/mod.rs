@@ -19,12 +19,17 @@
 mod netlink;
 mod raw_record;
 
+/// A raw audit record received from the kernel via netlink.
 #[derive(Debug, PartialEq)]
 pub struct RawAuditRecord {
+    /// The record ID.
     pub record_id: u16,
+    /// The data of the record.
     pub data: String,
 }
 
+/// A transport for receiving raw audit records from the kernel via netlink and
+/// forwarding them to an intermediary MPSC channel for parsing.
 pub struct NetlinkAuditTransport {
     pub(crate) receiver: tokio::sync::mpsc::Receiver<RawAuditRecord>,
 }

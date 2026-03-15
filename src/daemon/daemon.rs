@@ -6,7 +6,7 @@ use anyhow::{Context, Result, anyhow};
 use daemonize::{Daemonize, Outcome};
 use std::fs::{self, File};
 use std::path::PathBuf;
-use std::process::{Command, exit};
+use std::process::Command;
 
 use crate::daemon::PID_FILE_NAME;
 use crate::daemon::worker::run_worker;
@@ -147,14 +147,12 @@ fn prepare_auditrs() -> Result<()> {
 // Once it falls out of scope (i.e., daemon exits), the Drop trait will make
 // sure the pid file gets deleted.
 struct FileGuard {
-    file: std::fs::File,
     path: PathBuf,
 }
 
 impl FileGuard {
     fn new(path: PathBuf) -> Result<Self, std::io::Error> {
-        let file = std::fs::File::open(&path)?;
-        Ok(Self { file, path })
+        Ok(Self { path })
     }
 }
 

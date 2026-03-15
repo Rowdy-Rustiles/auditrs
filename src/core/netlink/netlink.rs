@@ -7,6 +7,8 @@ use tokio::sync::mpsc;
 use crate::core::netlink::{NetlinkAuditTransport, RawAuditRecord};
 
 impl NetlinkAuditTransport {
+    /// Creates a new `NetlinkAuditTransport` and spawns a task to listen for
+    /// audit events.
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel(1000);
         tokio::spawn(async move {
@@ -16,26 +18,25 @@ impl NetlinkAuditTransport {
         });
         Self { receiver }
     }
-    fn read_message_inner(&self) -> Option<Vec<u8>> {
-        None
-    }
+    /// Converts the `NetlinkAuditTransport` into a receiver for the raw audit
+    /// records.
     pub fn into_receiver(self) -> mpsc::Receiver<RawAuditRecord> {
         self.receiver
     }
-    fn into_receiver_inner(self) -> mpsc::Receiver<RawAuditRecord> {
-        self.receiver
-    }
-    async fn recv_inner(&mut self) -> Option<RawAuditRecord> {
+
+    /// Receives a raw audit record from the kernel via netlink.
+    async fn recv(&mut self) -> Option<RawAuditRecord> {
         self.receiver.recv().await
     }
 }
 
-impl Default for NetlinkAuditTransport {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
+/// Async listener that listens for audit messages emitted by the kernel via the
+/// netlink socket and forwards them into the a MPSC channel via the `sender`
+/// parameter. Used in the constructor of `NetlinkAuditTransport`.
+///
+/// **Parameters:**
+///
+/// * `sender`: The MPSC channel to forward the raw audit records to.
 async fn netlink_listener_task(sender: mpsc::Sender<RawAuditRecord>) -> Result<()> {
     // Create netlink socket connection
     let (connection, mut handle, mut messages) =

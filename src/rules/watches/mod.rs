@@ -17,7 +17,6 @@ pub use watches::{
     update_watch_interactive,
 };
 
-use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -54,10 +53,14 @@ pub struct Watches(pub(crate) Vec<AuditWatch>);
 /// path coupled with the actions to be taken on it.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuditWatch {
+    /// The path to watch.
     pub path: PathBuf,
+    /// The actions to take on the path.
     pub actions: Vec<WatchAction>,
+    /// Whether the watch should be recursive.
     pub recursive: bool,
     #[serde(default)]
+    /// The automatically generated hash key for the watch.
     pub key: String,
     // pub duration: Option<Duration>,
     // pub from: Option<DateTime<Utc>>,

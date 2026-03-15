@@ -1,3 +1,5 @@
+//! Parsing of raw audit records into structured events.
+
 pub mod audit_types;
 pub mod parser;
 

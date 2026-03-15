@@ -10,7 +10,7 @@
 use anyhow::Result;
 use std::process::Command;
 use std::{
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::{BufRead, BufReader, Seek, SeekFrom, Write},
 };
 
@@ -103,7 +103,7 @@ fn watch_to_auditctl_format(watch: &AuditWatch, delete: bool) -> String {
 
     // Using the auditctl cli tool, the dir argument automatically enables recursive
     // watching, the path argument does not allow recursive watching.
-    let mut recursive_str = String::new();
+    let recursive_str;
     let mut path_str = String::from(watch.path.to_string_lossy());
     if watch.recursive {
         recursive_str = "dir=".to_string();
