@@ -303,6 +303,7 @@ pub fn get_watches(state: &State) -> Result<()> {
 /// **Parameters:**
 ///
 /// * `key`: The unique key identifying the watch to remove.
+/// TODO: I think this is bugged rn, may be removing multiple watches on the same directory with different keys?
 fn remove_watch(key: &str) -> Result<()> {
     let mut current = load_watches()?;
     current.0.retain(|w| w.key != key);

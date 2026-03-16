@@ -1,4 +1,4 @@
-//! Daemon lifecycle and orchestration for `auditrs`.
+//! Daemon lifecycle and orchestration.
 //!
 //! This module wires the long-running audit daemon together:
 //! - `control` exposes CLI-facing operations for starting, stopping, reloading,

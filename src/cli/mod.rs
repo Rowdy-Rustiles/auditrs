@@ -1,4 +1,4 @@
-//! Top-level CLI module for `auditrs`.
+//! Top-level CLI module.
 //!
 //! This module defines the command-line interface surface of the daemon:
 //! - `cli` contains the clap-based command hierarchy and argument parsing.

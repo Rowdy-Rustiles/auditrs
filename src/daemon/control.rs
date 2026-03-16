@@ -6,7 +6,7 @@
 //! user-friendly status output suitable for terminal use.
 
 use anyhow::{Context, Result};
-use colorized::*;
+use colorized::{colorize_println, Colors};
 
 use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 
@@ -61,6 +61,8 @@ pub fn stop_auditrs(reboot: bool) -> Result<()> {
 /// process. Configuration is reloaded as part of the restart sequence.
 /// For a dynamic, in-place configuration reload without a full restart,
 /// prefer `reload_auditrs`.
+/// 
+/// TODO: Must test, not sure that this is working as expected.
 pub fn reboot_auditrs() -> Result<()> {
     // If the daemon is not running, we don't need to reboot
     if !is_running()? {

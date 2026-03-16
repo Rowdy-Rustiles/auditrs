@@ -10,8 +10,9 @@
 //! - **`FilePathCompleter`**: filesystem-aware autocomplete for paths with
 //!   fuzzy matching.
 
-// TODO: This module could be consolidated into a single autocompleter struct/trait implementation.
-// Essentially the only thing that differentiates the autocompleters is the type of data they are autocompleting.
+// TODO: This module could be consolidated into a single autocompleter
+// struct/trait implementation. Essentially the only thing that differentiates
+// the autocompleters is the type of data they are autocompleting.
 
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;

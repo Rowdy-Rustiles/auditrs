@@ -1,4 +1,4 @@
-//! Shared utilities for the `auditrs` project.
+//! Shared utilities for the codebase.
 //!
 //! This module collects small, reusable helpers that are shared across
 //! subsystems:

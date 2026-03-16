@@ -1,4 +1,4 @@
-//! Top-level configuration module for `auditrs`.
+//! Configuration module for editing core daemon settings.
 //!
 //! This module is responsible for **core daemon configuration**, such as
 //! log directories, file sizes, and output formats. It provides:

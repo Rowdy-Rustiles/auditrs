@@ -106,8 +106,10 @@ impl AuditLogWriter {
     /// **Parameters:**
     ///
     /// * `event`: The `AuditEvent` to be written.
+    /// TODO: Primary log file write path is not creating a new file with the proper extension when the log format changes.
     pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
         let write_primary = self.check_watch_events(&event);
+        self.ensure_directories()?;
         match self.log_format {
             LogFormat::Legacy => self.write_event_legacy(event, write_primary)?,
             LogFormat::Simple => self.write_event_simple(event, write_primary)?,
@@ -134,14 +136,15 @@ impl AuditLogWriter {
     fn write_event_legacy(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
         let mut prefix: String = String::new();
         let mut fields: String = String::new();
-        for record in event.records {
+
+        for record in &event.records {
             prefix.push_str(&format!(
                 "type={} msg=audit({}:{}",
                 record.record_type.as_audit_str(),
                 systemtime_to_timestamp_string(event.timestamp)?,
                 event.serial
             ));
-            for field in record.fields {
+            for field in &record.fields {
                 fields.push_str(&format!(" {}={}", field.0, field.1));
             }
         }
@@ -151,7 +154,22 @@ impl AuditLogWriter {
         self.active.file_handle.flush()?;
 
         if write_primary {
-            self.write_primary(event_str)?;
+            let filtered_event = self.apply_filters(&event.clone());
+            let mut filtered_prefix: String = String::new();
+            let mut filtered_fields: String = String::new();
+            for record in filtered_event.records {
+                filtered_prefix.push_str(&format!(
+                    "type={} msg=audit({}:{}",
+                    record.record_type.as_audit_str(),
+                    systemtime_to_timestamp_string(event.timestamp)?,
+                    event.serial
+                ));
+                for field in record.fields {
+                    filtered_fields.push_str(&format!(" {}={}", field.0, field.1));
+                }
+            }
+            let filtered_event_str = format!("{}{}", filtered_prefix, filtered_fields);
+            self.write_primary(filtered_event_str)?;
         }
 
         Ok(())
@@ -180,7 +198,8 @@ impl AuditLogWriter {
         self.active.file_handle.flush()?;
 
         if write_primary {
-            self.write_primary(event_str)?;
+            let filtered_event = self.apply_filters(&event);
+            self.write_primary(format!("{}", filtered_event))?;
         }
 
         Ok(())
@@ -241,6 +260,27 @@ impl AuditLogWriter {
         Ok(())
     }
 
+    /// Applies the filters to the event, removing records that match the filters.
+    /// This is a temporary implementation as filters should be applied based on their action type.
+    /// 
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` to apply the filters to.
+    ///
+    fn apply_filters(&self, event: &AuditEvent) -> AuditEvent {
+        let filters = &self.state.rules.filters.0;
+        let mut filtered_event = event.clone();
+        filtered_event.records.retain(|record| { 
+            // If no filters are applied, return true and retain the record.
+            !filters
+                .iter()
+                .any(|filter| filter.record_type == record.record_type)
+        });
+        // Update the record count to the new number of records.
+        filtered_event.record_count = filtered_event.records.len() as u16;
+        filtered_event
+    }
+
     /// Check if the audit event contains a record with a key identifier that
     /// matches a configured watch.
     ///
@@ -269,6 +309,13 @@ impl AuditLogWriter {
     /// Returns the filesystem path of the current active log file.
     fn active_log_path(&self) -> PathBuf {
         self.active.path.clone()
+    }
+
+    fn ensure_directories(&self) -> Result<()> {
+        create_dir_all(&self.active_directory)?;
+        create_dir_all(&self.journal_directory)?;
+        create_dir_all(&self.primary_directory)?;
+        Ok(())
     }
 
     /// Check log size for log rotation.

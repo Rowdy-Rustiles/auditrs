@@ -1,4 +1,4 @@
-//! Core processing pipeline for `auditrs`.
+//! Core audit record processing pipeline.
 //!
 //! The `core` module contains the main building blocks of the event pipeline:
 //! - `netlink`: low-level integration with the Linux audit subsystem and

@@ -14,8 +14,10 @@
 //!
 //! https://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md
 
+use serde::Deserialize;
+
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter, strum::EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumIter, strum::EnumString, Deserialize)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecordType {
     /* =========================
