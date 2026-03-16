@@ -27,7 +27,10 @@ impl Filters {
     /// Returns the list of record types currently defined in the filters (for
     /// autocomplete).
     pub fn record_types(&self) -> Vec<String> {
-        self.0.iter().map(|f| f.record_type.clone()).collect()
+        self.0
+            .iter()
+            .map(|f| f.record_type.as_audit_str().to_string().to_lowercase())
+            .collect()
     }
 
     /// Returns the underlying filter list.
@@ -61,7 +64,9 @@ impl Filters {
                 arr.iter()
                     .filter_map(|v| v.as_table())
                     .filter_map(|table| {
-                        let record_type = table.get("record_type")?.as_str()?.to_string();
+                        let record_type_str = table.get("record_type")?.as_str()?;
+                        let record_type =
+                            RecordType::from_str(&record_type_str.to_uppercase()).ok()?;
                         let action_str = table.get("action")?.as_str()?.to_string();
                         let action = FilterAction::from_str(&action_str.to_lowercase()).ok()?;
                         Some(AuditFilter {
@@ -111,7 +116,7 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
             let mut table = toml::map::Map::new();
             table.insert(
                 "record_type".into(),
-                toml::Value::String(f.record_type.clone()),
+                toml::Value::String(f.record_type.as_audit_str().to_string().to_lowercase()),
             );
             table.insert(
                 "action".into(),
@@ -169,10 +174,10 @@ fn set_filter(filter: AuditFilter) -> Result<()> {
 ///
 /// * `record_type`: Record type identifier to remove filters for.
 fn remove_filter(record_type: &str) -> Result<()> {
+    let parsed = RecordType::from_str(&record_type.to_uppercase())
+        .map_err(|_| anyhow!("unknown record type '{}'", record_type))?;
     let mut current = load_filters()?;
-    current
-        .0
-        .retain(|f| !f.record_type.eq_ignore_ascii_case(record_type));
+    current.0.retain(|f| f.record_type != parsed);
     persist_filters(&current.0)
 }
 
@@ -188,7 +193,11 @@ pub fn get_filters(state: &State) -> Result<()> {
     } else {
         println!("Filters:");
         for filter in filters {
-            println!("    {}: {}", filter.record_type, filter.action.as_ref());
+            println!(
+                "    {}: {}",
+                filter.record_type.as_audit_str(),
+                filter.action.as_ref()
+            );
         }
     }
     Ok(())
@@ -235,8 +244,9 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
     let action_str = Select::new("Select an action for this record type", actions).prompt()?;
     let action = FilterAction::from_str(&action_str.to_lowercase())?;
 
+    let record_type_parsed = RecordType::from_str(&record_type.to_uppercase())?;
     let filter = AuditFilter {
-        record_type,
+        record_type: record_type_parsed,
         action,
     };
     set_filter(filter)
@@ -323,8 +333,9 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
     let action_str = Select::new("Select new action for this record type", actions).prompt()?;
     let action = FilterAction::from_str(&action_str.to_lowercase())?;
 
+    let record_type_parsed = RecordType::from_str(&record_type.to_uppercase())?;
     let filter = AuditFilter {
-        record_type,
+        record_type: record_type_parsed,
         action,
     };
     set_filter(filter)
@@ -371,7 +382,7 @@ fn validate_and_build_filter(
     })?;
 
     Ok(AuditFilter {
-        record_type: parsed_rt.as_audit_str().to_lowercase(),
+        record_type: parsed_rt,
         action: parsed_action,
     })
 }
@@ -593,7 +604,9 @@ fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
                     let mut filter_table = toml::map::Map::new();
                     filter_table.insert(
                         "record_type".into(),
-                        toml::Value::String(f.record_type.clone()),
+                        toml::Value::String(
+                            f.record_type.as_audit_str().to_string().to_lowercase(),
+                        ),
                     );
                     filter_table.insert(
                         "action".into(),
@@ -617,7 +630,7 @@ fn to_ars_format(filters: &[AuditFilter]) -> Result<String> {
     for filter in filters {
         content.push_str(&format!(
             "{}: {}\n",
-            filter.record_type,
+            filter.record_type.as_audit_str(),
             filter.action.as_ref()
         ));
     }
