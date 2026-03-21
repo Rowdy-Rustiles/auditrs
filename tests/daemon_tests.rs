@@ -1,3 +1,11 @@
+//! Integration tests for the auditrs daemon.
+//!
+//! Mark any test requiring daemon file management with the `daemonization`
+//! serial group attribute (to ensure tests don't run in parallel and interfere
+//! with each other). Tests requiring sudo privileges should additionally be
+//! marked with the `ignore` attribute so they are not run alongside the
+//! non-privileged/unit tests. Most tests in this file require sudo privileges,
+
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -35,6 +43,7 @@ fn cleanup() -> Result<()> {
 }
 
 #[test]
+#[ignore]
 #[serial(daemonization)]
 fn test_start_daemon_control_init() {
     Command::new(AUDITRS_DEBUG_EXEC)
@@ -56,6 +65,7 @@ fn test_start_daemon_control_init() {
 }
 
 #[test]
+#[ignore]
 #[serial(daemonization)]
 fn test_start_daemon_audit_init() {
     Command::new(AUDITRS_DEBUG_EXEC)
@@ -81,6 +91,7 @@ fn test_start_daemon_audit_init() {
 }
 
 #[test]
+#[ignore]
 #[serial(daemonization)]
 fn test_stop_daemon() {
     let start = Command::new(AUDITRS_DEBUG_EXEC)
@@ -141,6 +152,7 @@ fn test_stop_daemon() {
 }
 
 #[test]
+#[ignore]
 #[serial(daemonization)]
 fn test_daemon_running() {
     Command::new(AUDITRS_DEBUG_EXEC)
@@ -170,6 +182,7 @@ fn test_daemon_running() {
 }
 
 #[test]
+#[ignore]
 #[serial(daemonization)]
 fn test_daemon_running_status() {
     Command::new(AUDITRS_DEBUG_EXEC)
@@ -190,6 +203,7 @@ fn test_daemon_running_status() {
 }
 
 #[test]
+#[ignore]
 #[serial(daemonization)]
 fn test_daemon_not_running_status() {
     let stdout = Command::new(AUDITRS_DEBUG_EXEC)

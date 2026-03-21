@@ -39,3 +39,46 @@ impl fmt::Display for AuditEvent {
         write!(f, "{}", output)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::core::parser::{ParsedAuditRecord, RecordType};
+    use std::{collections::HashMap, time::SystemTime};
+
+    fn create_test_event() -> AuditEvent {
+        let timestamp = SystemTime::UNIX_EPOCH;
+        AuditEvent {
+            timestamp: timestamp,
+            serial: 1,
+            record_count: 1,
+            records: vec![ParsedAuditRecord {
+                timestamp: timestamp,
+                serial: 1,
+                record_type: RecordType::AddGroup,
+                fields: HashMap::new(),
+            }],
+        }
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let event = create_test_event();
+        let expected = concat!(
+            "SystemTime { tv_sec: 0, tv_nsec: 0 } Record Count: 1 records: {\n",
+            "\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {} }\n",
+            "}\n",
+        );
+        assert_eq!(format!("{event:?}"), expected);
+    }
+
+    #[test]
+    fn test_display_format() {
+        let event = create_test_event();
+        let expected = concat!(
+            "[1970-01-01T00:00:00.000Z][Record Count: 1] Audit Event Group 1:\n",
+            "\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {} }\n",
+        );
+        assert_eq!(format!("{event}"), expected);
+    }
+}
