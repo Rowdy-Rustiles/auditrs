@@ -79,10 +79,10 @@ impl Correlator {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
-    fn create_test_record() -> ParsedAuditRecord {
+    fn create_record() -> ParsedAuditRecord {
         let time = SystemTime::now();
         ParsedAuditRecord {
             fields: HashMap::<String, String>::new(),
@@ -115,7 +115,7 @@ mod test {
     /// Ensure that the push function properly adds a new event to the buffer.
     fn push_new_event() {
         let mut correlator = Correlator::new();
-        let record = create_test_record();
+        let record = create_record();
 
         correlator.push(record);
 
@@ -160,7 +160,7 @@ mod test {
 
     #[test]
     // Flush the event buffer and check the flushed events
-    fn test_flush_to_event() {
+    fn flush_to_event() {
         let mut correlator = Correlator::new();
         let (record, record_2) = create_audit_records_for_event(true);
         correlator.push(record.clone());
@@ -179,7 +179,7 @@ mod test {
     #[test]
     /// Check that the event buffer is not flushed if the timeout has not
     /// elapsed.
-    fn test_insufficient_time_to_flush_event() {
+    fn insufficient_time_to_flush_event() {
         let mut correlator = Correlator::new();
         let (record, record_2) = create_audit_records_for_event(true);
         correlator.push(record);

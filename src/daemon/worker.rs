@@ -58,7 +58,7 @@ pub async fn run_worker() -> Result<()> {
     let (config_tx, config_rx) = watch::channel(state.config);
     let (rules_tx, rules_rx) = watch::channel(state.rules);
 
-    let writer = AuditLogWriter::new()?;
+    let writer = AuditLogWriter::new(None)?;
     let transport = NetlinkAuditTransport::new();
     let raw_audit_rx = transport.into_receiver();
     let correlator = Correlator::new();

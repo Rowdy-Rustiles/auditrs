@@ -41,10 +41,14 @@ impl AuditLogWriter {
     ///
     /// **Parameters:**
     ///
-    /// This constructor does not take parameters; it always initializes from
-    /// the currently loaded `State`.
-    pub fn new() -> anyhow::Result<Self> {
-        let state = State::load_state()?;
+    /// This constructor takes an optional `State` parameter which can be passed
+    /// in for unit testing but should be otherwise loaded from disk.
+    pub fn new(state: Option<State>) -> anyhow::Result<Self> {
+        let state = if let Some(state) = state {
+            state
+        } else {
+            State::load_state()?
+        };
         let config = &state.config;
 
         let active_directory = PathBuf::from(&config.active_directory);
@@ -123,7 +127,7 @@ impl AuditLogWriter {
     ///
     /// The output takes the form:
     /// ```ignore
-    /// type=... msg=audit(<timestamp>:<serial>) key1=val1 key2=val2 ...
+    /// type=... msg=audit(<timestamp>:<serial>): key1=val1 key2=val2 ...
     /// ```
     ///
     /// **Parameters:**
@@ -132,11 +136,12 @@ impl AuditLogWriter {
     /// * `write_primary`: When `true`, the same formatted line is also written
     ///   to the primary log in addition to the active log.
     fn write_event_legacy(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
-        let mut prefix: String = String::new();
-        let mut fields: String = String::new();
+        let mut event_str: String = String::new();
         for record in event.records {
+            let mut prefix: String = String::new();
+            let mut fields: String = String::new();
             prefix.push_str(&format!(
-                "type={} msg=audit({}:{}",
+                "type={} msg=audit({}:{}):",
                 record.record_type.as_audit_str(),
                 systemtime_to_timestamp_string(event.timestamp)?,
                 event.serial
@@ -144,10 +149,10 @@ impl AuditLogWriter {
             for field in record.fields {
                 fields.push_str(&format!(" {}={}", field.0, field.1));
             }
+            event_str.push_str(&format!("{}{}\n", prefix, fields));
         }
-        let event_str = format!("{}{}", prefix, fields);
 
-        writeln!(self.active.file_handle, "{}", event_str)?;
+        write!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
 
         if write_primary {
@@ -401,5 +406,166 @@ impl AuditLogWriter {
     /// log, based on the configured watches.
     pub fn reload_rules(&mut self, rules: &Rules) {
         self.state.rules = rules.clone();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        core::parser::{ParsedAuditRecord, RecordType},
+        rules::{Filters, Watches},
+    };
+    use serial_test::serial;
+    use std::{collections::HashMap, path::Path, time::SystemTime};
+
+    fn get_state() -> State {
+        State {
+            config: AuditConfig {
+                active_directory: ("./tmp/auditrs/active").to_string(),
+                journal_directory: "./tmp/auditrs/journal".to_string(),
+                primary_directory: "./tmp/auditrs/primary".to_string(),
+                log_size: 1024,
+                journal_size: 10,
+                log_format: LogFormat::Legacy,
+                primary_size: 1024,
+            },
+            rules: Rules {
+                filters: Filters(Vec::new()),
+                watches: Watches(Vec::new()),
+            },
+        }
+    }
+
+    fn create_event(multiple_records: bool) -> AuditEvent {
+        let timestamp = SystemTime::UNIX_EPOCH;
+
+        AuditEvent {
+            timestamp: timestamp,
+            serial: 1,
+            record_count: 1,
+            records: if multiple_records {
+                vec![
+                    ParsedAuditRecord {
+                        timestamp: timestamp,
+                        serial: 1,
+                        record_type: RecordType::AddGroup,
+                        fields: HashMap::from([("key".to_string(), "value".to_string())]),
+                    },
+                    ParsedAuditRecord {
+                        timestamp: timestamp,
+                        serial: 1,
+                        record_type: RecordType::DelGroup,
+                        fields: HashMap::from([("key_2".to_string(), "value_2".to_string())]),
+                    },
+                ]
+            } else {
+                vec![ParsedAuditRecord {
+                    timestamp: timestamp,
+                    serial: 1,
+                    record_type: RecordType::AddGroup,
+                    fields: HashMap::from([("key".to_string(), "value".to_string())]),
+                }]
+            },
+        }
+    }
+
+    fn cleanup() {
+        let _ = std::fs::remove_dir_all(Path::new("./tmp/auditrs"));
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn writer_new() {
+        let state = get_state();
+        let writer = AuditLogWriter::new(Some(state)).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.log").exists());
+        assert!(Path::new("./tmp/auditrs/journal").is_dir());
+        assert!(Path::new("./tmp/auditrs/primary").is_dir());
+        assert!(Path::new("./tmp/auditrs/active").is_dir());
+        assert_eq!(
+            writer.active.path,
+            PathBuf::from("./tmp/auditrs/active/auditrs.log")
+        );
+        assert_eq!(writer.journal.paths.len(), 0);
+        assert_eq!(writer.primary.paths.len(), 0);
+        assert_eq!(writer.log_size, 1024);
+        assert_eq!(writer.journal_size, 10);
+        assert_eq!(writer.primary_size, 1024);
+        assert_eq!(writer.log_format, LogFormat::Legacy);
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_event_legacy() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        writer.write_event(event).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.log").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.log")).unwrap();
+        assert_eq!(contents, "type=ADD_GROUP msg=audit(0.000:1): key=value\n");
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    /// Test an event with multiple records within it. Legacy formatting does
+    /// not correlate records so those should be written as disjoint items.
+    fn write_event_legacy_multiple_records() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(true);
+        writer.write_event(event).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.log").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.log")).unwrap();
+        assert_eq!(
+            contents,
+            "type=ADD_GROUP msg=audit(0.000:1): key=value\ntype=DEL_GROUP msg=audit(0.000:1): key_2=value_2\n"
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    /// Test writing multiple events and records.
+    fn write_event_legacy_multiple_events() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        // Write multiple events to the active log
+        for _ in 0..10 {
+            writer.write_event(event.clone()).unwrap();
+        }
+        assert!(Path::new("./tmp/auditrs/active/auditrs.log").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.log")).unwrap();
+        assert_eq!(
+            contents,
+            "type=ADD_GROUP msg=audit(0.000:1): key=value\n".repeat(10)
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_event_legacy_mixed_items() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        let event_2 = create_event(true);
+        writer.write_event(event).unwrap();
+        writer.write_event(event_2).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.log").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.log")).unwrap();
+        assert_eq!(
+            contents,
+            "type=ADD_GROUP msg=audit(0.000:1): key=value\ntype=ADD_GROUP msg=audit(0.000:1): key=value\ntype=DEL_GROUP msg=audit(0.000:1): key_2=value_2\n"
+        );
+        cleanup();
     }
 }

@@ -101,7 +101,7 @@ async fn netlink_listener_task(sender: mpsc::Sender<RawAuditRecord>) -> Result<(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use netlink_packet_core::NetlinkHeader;
     use std::time::Duration;

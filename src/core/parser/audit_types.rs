@@ -564,7 +564,7 @@ impl RecordType {
             Self::UserMacStatus => "USER_MAC_STATUS",
 
             // User Crypto
-            Self::CryptoTestUser => "CRYPTO_TEST_USER",
+            Self::CryptoTestUser => "CRYPTO_USER",
             Self::CryptoParamChangeUser => "CRYPTO_PARAM_CHANGE_USER",
             Self::CryptoLogin => "CRYPTO_LOGIN",
             Self::CryptoLogout => "CRYPTO_LOGOUT",
@@ -1145,21 +1145,21 @@ impl From<RecordType> for u16 {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_record_type_from_u16() {
+    fn record_type_from_u16() {
         assert_eq!(RecordType::from(1000), RecordType::GetStatus);
     }
 
     #[test]
-    fn test_record_type_to_u16() {
+    fn record_type_to_u16() {
         assert_eq!(u16::from(RecordType::GetStatus), 1000);
     }
 
     #[test]
-    fn test_record_type_as_audit_str() {
+    fn record_type_as_audit_str() {
         assert_eq!(RecordType::GetStatus.as_audit_str(), "GET_STATUS");
     }
 }

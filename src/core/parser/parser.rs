@@ -158,13 +158,13 @@ fn parse_audit_message(input: &str) -> IResult<&str, RecordData> {
 
 // tests
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::core::parser::RecordType;
 
     use super::*;
 
     #[test]
-    fn test_parse_audit_message() {
+    fn parse_audit_message_ok() {
         let input = "audit(1234567890.123:456): key1=value";
         let expected_timestamp = timestamp_string_to_systemtime("1234567890.123").unwrap();
         let expected_serial = "456".to_string();
@@ -188,7 +188,7 @@ mod test {
     }
 
     #[test]
-    fn test_parsed_try_from_raw_audit_record() {
+    fn parsed_try_from_raw_audit_record() {
         let raw_record =
             RawAuditRecord::new(1000, "audit(1234567890.123:456): key1=value".to_string());
         let parsed_record = ParsedAuditRecord::try_from(raw_record).unwrap();
@@ -205,7 +205,7 @@ mod test {
     }
 
     #[test]
-    fn test_identifier() {
+    fn identifier() {
         let parsed_record = ParsedAuditRecord {
             record_type: RecordType::GetStatus,
             timestamp: timestamp_string_to_systemtime("1234567890.123").unwrap(),
@@ -219,7 +219,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_audit_message_quoted_value_with_spaces() {
+    fn parse_audit_message_quoted_value_with_spaces() {
         let input = r#"audit(1234567890.123:1): msg="hello world""#;
         let (_, parsed) = parse_audit_message(input).unwrap();
         assert_eq!(
@@ -229,7 +229,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_audit_message_multiple_key_value_pairs() {
+    fn parse_audit_message_multiple_key_value_pairs() {
         let input = "audit(1234567890.123:2): a=1 b=two c=three";
         let (_, parsed) = parse_audit_message(input).unwrap();
         assert_eq!(
@@ -243,7 +243,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_audit_message_skips_empty_key_before_equals() {
+    fn parse_audit_message_skips_empty_key_before_equals() {
         // Leading `=foo` yields an empty key for the first pair and is skipped.
         let input = "audit(1234567890.123:3): =skipped key1=kept";
         let (_, parsed) = parse_audit_message(input).unwrap();
@@ -254,23 +254,23 @@ mod test {
     }
 
     #[test]
-    fn test_parse_audit_message_rejects_invalid_prefix() {
+    fn parse_audit_message_rejects_invalid_prefix() {
         assert!(parse_audit_message("not_audit(1.2:3): k=v").is_err());
     }
 
     #[test]
-    fn test_parse_audit_message_requires_space_after_header() {
+    fn parse_audit_message_requires_space_after_header() {
         assert!(parse_audit_message("audit(1234567890.123:4):k=v").is_err());
     }
 
     #[test]
-    fn test_try_from_raw_rejects_unparseable_line() {
+    fn try_from_raw_rejects_unparseable_line() {
         let raw = RawAuditRecord::new(1300, "this is not an audit line".to_string());
         assert!(ParsedAuditRecord::try_from(raw).is_err());
     }
 
     #[test]
-    fn test_try_from_serial_overflow_defaults_to_zero() {
+    fn try_from_serial_overflow_defaults_to_zero() {
         // Header serial is > u16::MAX - parse::<u16>() fails and unwrap_or(0) applies.
         let raw = RawAuditRecord::new(1300, "audit(1234567890.123:70000): key1=value".to_string());
         let parsed = ParsedAuditRecord::try_from(raw).unwrap();
