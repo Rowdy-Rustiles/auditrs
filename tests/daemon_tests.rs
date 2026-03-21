@@ -1,8 +1,12 @@
-use std::{fs::File, io::{BufRead, BufReader}, path::Path, process::Command};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+    process::Command,
+};
 
 use anyhow::Result;
 use serial_test::serial;
-
 
 const AUDITRS_DEBUG_EXEC: &str = "./target/debug/auditrs";
 const AUDITRS_CONFIG_DIR: &str = "/etc/auditrs";
@@ -14,7 +18,7 @@ const AUDITRS_PID_FILE: &str = "/var/run/auditrs.pid";
 const AUDITRS_STDOUT_FILE: &str = "/tmp/daemon.out";
 const AUDITRS_STDERR_FILE: &str = "/tmp/daemon.err";
 
-fn cleanup() -> Result<()>{
+fn cleanup() -> Result<()> {
     Command::new(AUDITRS_DEBUG_EXEC)
         .arg("stop")
         .output()
@@ -72,7 +76,7 @@ fn test_start_daemon_audit_init() {
     let rules_file = Path::new(AUDITRS_RULES_FILE);
     assert!(config_file.exists());
     assert!(rules_file.exists());
-    
+
     cleanup().expect("Failed to cleanup");
 }
 
@@ -127,7 +131,11 @@ fn test_stop_daemon() {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
-    assert!(stopped, "daemon with pid {} did not stop within timeout", pid);
+    assert!(
+        stopped,
+        "daemon with pid {} did not stop within timeout",
+        pid
+    );
 
     cleanup().expect("Failed to cleanup");
 }
@@ -143,7 +151,11 @@ fn test_daemon_running() {
     // Read the pid from the pid file
     let pid_file = Path::new(AUDITRS_PID_FILE);
     let pid_file_reader = BufReader::new(File::open(pid_file).expect("Failed to open pid file"));
-    let pid = pid_file_reader.lines().next().expect("Could not read pid from pid file").expect("Could not parse pid from pid file");
+    let pid = pid_file_reader
+        .lines()
+        .next()
+        .expect("Could not read pid from pid file")
+        .expect("Could not parse pid from pid file");
 
     // Check the command status of process with pid `pid` using `kill -0 <pid>`
     // This should return an exit status of 0 if the process is running
@@ -174,7 +186,6 @@ fn test_daemon_running_status() {
     let stdout_str = String::from_utf8_lossy(&stdout);
     assert!(stdout_str.contains("Auditrs is running"));
 
-    
     cleanup().expect("Failed to cleanup");
 }
 

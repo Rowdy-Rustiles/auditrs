@@ -4,7 +4,7 @@
 use std::collections::{HashMap, hash_map::Entry};
 use std::time::{Duration, Instant, SystemTime};
 
-use crate::core::correlator::{Correlator, AuditEvent};
+use crate::core::correlator::{AuditEvent, Correlator};
 use crate::core::parser::ParsedAuditRecord;
 
 /// Duration after the last record in a buffer entry before that entry is
@@ -78,27 +78,44 @@ impl Correlator {
     }
 }
 
-impl Default for Correlator {
-    /// Return an empty correlator (same as `Correlator::new()`).
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
+    fn create_test_record() -> ParsedAuditRecord {
+        let time = SystemTime::now();
+        ParsedAuditRecord {
+            fields: HashMap::<String, String>::new(),
+            record_type: crate::core::parser::RecordType::AddGroup,
+            timestamp: time,
+            serial: 1,
+        }
+    }
+
+    /// If `grouped` is true, the two records will have the same serial number
+    /// and be grouped into the same event.
+    fn create_audit_records_for_event(grouped: bool) -> (ParsedAuditRecord, ParsedAuditRecord) {
+        let time = SystemTime::now();
+        let record = ParsedAuditRecord {
+            fields: HashMap::<String, String>::new(),
+            record_type: crate::core::parser::RecordType::AddGroup,
+            timestamp: time,
+            serial: 1,
+        };
+        let record_2 = ParsedAuditRecord {
+            fields: HashMap::<String, String>::new(),
+            record_type: crate::core::parser::RecordType::Add,
+            timestamp: time,
+            serial: if grouped { 1 } else { 2 },
+        };
+        (record, record_2)
+    }
+
     #[test]
+    /// Ensure that the push function properly adds a new event to the buffer.
     fn push_new_event() {
         let mut correlator = Correlator::new();
-        let time = SystemTime::now();
-        let record = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::AddGroup,
-            timestamp: time,
-            serial: 1
-        };
+        let record = create_test_record();
 
         correlator.push(record);
 
@@ -106,109 +123,72 @@ mod test {
     }
 
     #[test]
+    /// Check that correlated records are grouped into the same event in the
+    /// event buffer.
     fn push_correlated_records() {
         let mut correlator = Correlator::new();
-        let time = SystemTime::now();
-        let record = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::AddGroup,
-            timestamp: time,
-            serial: 1
-        };
+        let (record, record_2) = create_audit_records_for_event(true);
 
-        let record_2 = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::Add,
-            timestamp: time,
-            serial: 1
-        };
-
-        correlator.push(record);
-        correlator.push(record_2);
+        correlator.push(record.clone());
+        correlator.push(record_2.clone());
 
         assert!(correlator.event_buffer.len() == 1);
-    }
-
-     #[test]
-    fn push_uncorrelated_records() {
-        let mut correlator = Correlator::new();
-        let time = SystemTime::now();
-        let record = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::AddGroup,
-            timestamp: time,
-            serial: 1
-        };
-
-        let record_2 = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::Add,
-            timestamp: time,
-            // Note the differing serial number, this will lead to a different identifier from the previous correlated records test
-            serial: 2     
-        };
-
-        correlator.push(record);
-        correlator.push(record_2);
-
-        assert!(correlator.event_buffer.len() == 2);
+        // Check that the two records are stored under the same identifier
+        assert!(
+            correlator.event_buffer.get(&record.identifier()).unwrap()
+                == correlator.event_buffer.get(&record_2.identifier()).unwrap()
+        );
     }
 
     #[test]
+    /// Check that uncorrelated records are not grouped into the same event in
+    /// the event buffer.
+    fn push_uncorrelated_records() {
+        let mut correlator = Correlator::new();
+        let (record, record_2) = create_audit_records_for_event(false);
+
+        correlator.push(record.clone());
+        correlator.push(record_2.clone());
+
+        assert!(correlator.event_buffer.len() == 2);
+        // Check that the two records are stored under separate identifiers
+        assert!(
+            correlator.event_buffer.get(&record.identifier()).unwrap()
+                != correlator.event_buffer.get(&record_2.identifier()).unwrap()
+        );
+    }
+
+    #[test]
+    // Flush the event buffer and check the flushed events
     fn test_flush_to_event() {
         let mut correlator = Correlator::new();
-        let time = SystemTime::now();
-        let record = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::AddGroup,
-            timestamp: time,
-            serial: 1
-        };
+        let (record, record_2) = create_audit_records_for_event(true);
+        correlator.push(record.clone());
+        correlator.push(record_2.clone());
 
-        let record_2 = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::Add,
-            timestamp: time,
-            serial: 1
-        };
-
-        correlator.push(record);
-        correlator.push(record_2);
-
-        //
+        // Sleep for 3.5 seconds to ensure the timeout has elapsed
         std::thread::sleep(std::time::Duration::from_millis(3500));
         let events = correlator.flush_expired();
 
         println!("{:?}", events);
         assert!(events.len() == 1);
+        assert!(events[0].records[0] == record);
+        assert!(events[0].records[1] == record_2);
     }
 
-        #[test]
+    #[test]
+    /// Check that the event buffer is not flushed if the timeout has not
+    /// elapsed.
     fn test_insufficient_time_to_flush_event() {
         let mut correlator = Correlator::new();
-        let time = SystemTime::now();
-        let record = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::AddGroup,
-            timestamp: time,
-            serial: 1
-        };
-
-        let record_2 = ParsedAuditRecord {
-            fields: HashMap::<String, String>::new(),
-            record_type: crate::core::parser::RecordType::Add,
-            timestamp: time,
-            serial: 1
-        };
-
+        let (record, record_2) = create_audit_records_for_event(true);
         correlator.push(record);
         correlator.push(record_2);
 
-        //
         std::thread::sleep(std::time::Duration::from_millis(300));
         let events = correlator.flush_expired();
 
         println!("{:?}", events);
-        assert!(events.len() == 0);
+        assert!(events.is_empty());
     }
 }

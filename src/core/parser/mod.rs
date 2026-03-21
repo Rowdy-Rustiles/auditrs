@@ -27,7 +27,7 @@ pub struct RecordData {
 }
 
 /// A parsed audit record.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedAuditRecord {
     /// The type of the record.
     pub(crate) record_type: RecordType,
