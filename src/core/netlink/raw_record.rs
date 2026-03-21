@@ -1,3 +1,5 @@
+//! Raw audit record constructor implementation.
+
 use crate::core::netlink::RawAuditRecord;
 
 impl RawAuditRecord {
