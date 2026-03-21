@@ -164,7 +164,8 @@ mod test {
     async fn netlink_audit_transport_new_and_into_receiver() {
         let transport = NetlinkAuditTransport::new();
         let mut receiver = transport.into_receiver();
-        // Background task may fail immediately without audit privileges - we only check if the receiver is open
+        // Background task may fail immediately without audit privileges - we only check
+        // if the receiver is open
         let _ = tokio::time::timeout(Duration::from_millis(200), receiver.recv()).await;
     }
 }

@@ -1143,3 +1143,23 @@ impl From<RecordType> for u16 {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_record_type_from_u16() {
+        assert_eq!(RecordType::from(1000), RecordType::GetStatus);
+    }
+
+    #[test]
+    fn test_record_type_to_u16() {
+        assert_eq!(u16::from(RecordType::GetStatus), 1000);
+    }
+
+    #[test]
+    fn test_record_type_as_audit_str() {
+        assert_eq!(RecordType::GetStatus.as_audit_str(), "GET_STATUS");
+    }
+}
