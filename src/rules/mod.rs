@@ -23,7 +23,7 @@ const AUDIT_RULES_FILE: &str = "/etc/audit/audit.rules";
 
 /// Audit rules are collections of filters and watches that are applied to
 /// audit events before they can be written to the primary log.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Rules {
     /// The filters for the auditrs daemon.
     pub(crate) filters: Filters,

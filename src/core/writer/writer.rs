@@ -360,6 +360,9 @@ impl AuditLogWriter {
     /// **Parameters:**
     ///
     /// * `cfg`: The new `AuditConfig` to reload from.
+    ///
+    /// TODO: Work has to be done on the preservation of data after path
+    /// changes.
     pub fn reload_config(&mut self, cfg: &AuditConfig) -> Result<()> {
         let old_format = self.log_format;
         let old_active_dir = self.active_directory.clone();
@@ -386,15 +389,16 @@ impl AuditLogWriter {
         let journal_dir_changed = new_journal_dir != old_journal_dir;
         let primary_dir_changed = new_primary_dir != old_primary_dir;
 
+        self.log_format = new_format;
+        self.active_directory = new_active_dir;
+        self.journal_directory = new_journal_dir;
+        self.primary_directory = new_primary_dir;
+
         if format_changed || active_dir_changed || journal_dir_changed || primary_dir_changed {
             let _ = self.rotate_active_into_journal();
         }
 
         // Apply new settings
-        self.log_format = new_format;
-        self.active_directory = new_active_dir;
-        self.journal_directory = new_journal_dir;
-        self.primary_directory = new_primary_dir;
 
         // Reopen active file at new location/extension using updated settings
         self.open_fresh_active_for_current_settings()
@@ -678,7 +682,91 @@ mod tests {
         writer.write_event(event).unwrap();
         let primary_path = writer.primary.paths.last().unwrap();
         let contents = std::fs::read_to_string(primary_path).unwrap();
-        assert_eq!(contents, "type=ADD_GROUP msg=audit(0.000:1): key=auditrs_watch_1234567890\n");
+        assert_eq!(
+            contents,
+            "type=ADD_GROUP msg=audit(0.000:1): key=auditrs_watch_1234567890\n"
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn get_active_log_path() {
+        let state = get_state();
+        let writer = AuditLogWriter::new(Some(state)).unwrap();
+        assert_eq!(
+            writer.active_log_path(),
+            PathBuf::from("./tmp/auditrs/active/auditrs.log")
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn check_journal_rotation() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        for _ in 0..100 {
+            writer.write_event(event.clone()).unwrap();
+        }
+        let auditrs_journal_path = writer.journal.paths.last().unwrap();
+        let auditrs_journal_contents = std::fs::read_to_string(auditrs_journal_path).unwrap();
+        // Given the test state, the journal should be able to hold 23 test events
+        // written in legacy format
+        assert_eq!(
+            auditrs_journal_contents,
+            "type=ADD_GROUP msg=audit(0.000:1): key=value\n".repeat(23)
+        );
+        assert!(auditrs_journal_path.exists());
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn reload_config() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+
+        let new_config = AuditConfig {
+            active_directory: "./tmp/auditrs/NEW_CONFIG/active".to_string(),
+            journal_directory: "./tmp/auditrs/NEW_CONFIG/journal".to_string(),
+            primary_directory: "./tmp/auditrs/NEW_CONFIG/primary".to_string(),
+            log_size: 10240,
+            journal_size: 100,
+            log_format: LogFormat::Simple,
+            primary_size: 10240,
+        };
+        writer.reload_config(&new_config).unwrap();
+        assert!(Path::new("./tmp/auditrs/NEW_CONFIG/active/auditrs.slog").exists());
+        assert!(Path::new("./tmp/auditrs/NEW_CONFIG/journal").is_dir());
+        assert!(Path::new("./tmp/auditrs/NEW_CONFIG/primary").is_dir());
+        assert_eq!(
+            writer.active.path,
+            PathBuf::from("./tmp/auditrs/NEW_CONFIG/active/auditrs.slog")
+        );
+        // Since the format is changed alongside the paths, the original active
+        // log (of type .log) will be immediately rotated to the journal,
+        // regardless of its size, to make way for the new active log (of type
+        // .slog). As a result, the updated journal directory will contain an
+        // empty rotated log when the config is fully reloaded.
+        assert_eq!(writer.journal.paths.len(), 1);
+        assert_eq!(writer.primary.paths.len(), 0);
+        assert_eq!(writer.log_size, 10240);
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn reload_rules() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let new_rules = Rules {
+            filters: Filters(Vec::new()),
+            watches: Watches(Vec::new()),
+        };
+        writer.reload_rules(&new_rules);
+        assert_eq!(writer.state.rules, new_rules);
         cleanup();
     }
 }

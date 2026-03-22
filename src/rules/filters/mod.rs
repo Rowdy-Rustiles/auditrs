@@ -37,6 +37,8 @@ use serde::Deserialize;
     strum::AsRefStr,
     strum::Display,
     Deserialize,
+    PartialEq,
+    Eq,
 )]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -69,12 +71,12 @@ pub enum FilterAction {
 /// Filters are broad, record-type-based rules that specify which audit record
 /// types are written to the primary log based on a user-defined action. These
 /// are coarse-grained knobs for controlling the primary log's content.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Filters(pub(crate) Vec<AuditFilter>);
 
 /// The internal auditrs representation of a single filter, which is a record
 /// type coupled with the action to be taken on it.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct AuditFilter {
     /// The record type to filter.
     pub record_type: String,
