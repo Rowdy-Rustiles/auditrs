@@ -180,8 +180,8 @@ impl AuditLogWriter {
     /// * `write_primary`: When `true`, also mirrors the simple-formatted event
     ///   into the primary log.
     fn write_event_simple(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
-        let event_str = format!("{}", event);
-        writeln!(self.active.file_handle, "{}", event_str)?;
+        let event_str = format!("{}\n", event);
+        write!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
 
         if write_primary {
@@ -241,7 +241,7 @@ impl AuditLogWriter {
         };
 
         let mut file_handle = OpenOptions::new().create(true).append(true).open(&path)?;
-        writeln!(file_handle, "{}", line)?;
+        write!(file_handle, "{}", line)?;
         file_handle.flush()?;
         Ok(())
     }
@@ -414,7 +414,7 @@ mod tests {
     use super::*;
     use crate::{
         core::parser::{ParsedAuditRecord, RecordType},
-        rules::{Filters, Watches},
+        rules::{AuditWatch, Filters, WatchAction, Watches},
     };
     use serial_test::serial;
     use std::{collections::HashMap, path::Path, time::SystemTime};
@@ -432,7 +432,12 @@ mod tests {
             },
             rules: Rules {
                 filters: Filters(Vec::new()),
-                watches: Watches(Vec::new()),
+                watches: Watches(vec![AuditWatch {
+                    key: "auditrs_watch_1234567890".to_string(),
+                    path: PathBuf::from("./tmp/auditrs/primary/auditrs_watch_1234567890.log"),
+                    actions: vec![WatchAction::Read, WatchAction::Write, WatchAction::Execute],
+                    recursive: true,
+                }]),
             },
         }
     }
@@ -443,7 +448,7 @@ mod tests {
         AuditEvent {
             timestamp: timestamp,
             serial: 1,
-            record_count: 1,
+            record_count: if multiple_records { 2 } else { 1 },
             records: if multiple_records {
                 vec![
                     ParsedAuditRecord {
@@ -467,6 +472,24 @@ mod tests {
                     fields: HashMap::from([("key".to_string(), "value".to_string())]),
                 }]
             },
+        }
+    }
+
+    fn create_event_with_watch_key() -> AuditEvent {
+        let timestamp = SystemTime::UNIX_EPOCH;
+        AuditEvent {
+            timestamp: timestamp,
+            serial: 1,
+            record_count: 1,
+            records: vec![ParsedAuditRecord {
+                timestamp: timestamp,
+                serial: 1,
+                record_type: RecordType::AddGroup,
+                fields: HashMap::from([(
+                    "key".to_string(),
+                    "auditrs_watch_1234567890".to_string(),
+                )]),
+            }],
         }
     }
 
@@ -566,6 +589,96 @@ mod tests {
             contents,
             "type=ADD_GROUP msg=audit(0.000:1): key=value\ntype=ADD_GROUP msg=audit(0.000:1): key=value\ntype=DEL_GROUP msg=audit(0.000:1): key_2=value_2\n"
         );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_event_simple() {
+        let mut state = get_state();
+        state.config.log_format = LogFormat::Simple;
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        writer.write_event(event).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.slog").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.slog")).unwrap();
+        assert_eq!(
+            contents,
+            "[1970-01-01T00:00:00.000Z][Record Count: 1] Audit Event Group 1:\n\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key\": \"value\"} }\n\n"
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_event_simple_multiple_records() {
+        let mut state = get_state();
+        state.config.log_format = LogFormat::Simple;
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(true);
+        writer.write_event(event).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.slog").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.slog")).unwrap();
+        assert_eq!(
+            contents,
+            "[1970-01-01T00:00:00.000Z][Record Count: 2] Audit Event Group 1:\n\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key\": \"value\"} }\n\tRecord: ParsedAuditRecord { record_type: DelGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key_2\": \"value_2\"} }\n\n"
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    /// This test represents an impossible state, as the correlator should be
+    /// grouping these events into a single event. However, for the purpose
+    /// of testing multiple events, this is valid and represents the expected
+    /// formatting of multiple disjoint events.
+    fn write_event_simple_multiple_events() {
+        let mut state = get_state();
+        state.config.log_format = LogFormat::Simple;
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        for _ in 0..4 {
+            writer.write_event(event.clone()).unwrap();
+        }
+        assert!(Path::new("./tmp/auditrs/active/auditrs.slog").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.slog")).unwrap();
+        assert_eq!(contents, "[1970-01-01T00:00:00.000Z][Record Count: 1] Audit Event Group 1:\n\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key\": \"value\"} }\n\n".repeat(4));
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_event_simple_mixed_items() {
+        let mut state = get_state();
+        state.config.log_format = LogFormat::Simple;
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event(false);
+        let event_2 = create_event(true);
+        writer.write_event(event).unwrap();
+        writer.write_event(event_2).unwrap();
+        assert!(Path::new("./tmp/auditrs/active/auditrs.slog").exists());
+        let contents =
+            std::fs::read_to_string(Path::new("./tmp/auditrs/active/auditrs.slog")).unwrap();
+        assert_eq!(
+            contents,
+            "[1970-01-01T00:00:00.000Z][Record Count: 1] Audit Event Group 1:\n\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key\": \"value\"} }\n\n[1970-01-01T00:00:00.000Z][Record Count: 2] Audit Event Group 1:\n\tRecord: ParsedAuditRecord { record_type: AddGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key\": \"value\"} }\n\tRecord: ParsedAuditRecord { record_type: DelGroup, timestamp: SystemTime { tv_sec: 0, tv_nsec: 0 }, serial: 1, fields: {\"key_2\": \"value_2\"} }\n\n"
+        );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_legacy_to_primary() {
+        let state = get_state();
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event_with_watch_key();
+        writer.write_event(event).unwrap();
+        let primary_path = writer.primary.paths.last().unwrap();
+        let contents = std::fs::read_to_string(primary_path).unwrap();
+        assert_eq!(contents, "type=ADD_GROUP msg=audit(0.000:1): key=auditrs_watch_1234567890\n");
         cleanup();
     }
 }
