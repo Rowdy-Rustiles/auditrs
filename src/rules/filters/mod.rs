@@ -27,6 +27,8 @@ pub use filters::{
 
 use serde::Deserialize;
 
+use crate::core::parser::RecordType;
+
 /// The set of actions that can be taken by filters.
 #[derive(
     Debug,
@@ -79,7 +81,7 @@ pub struct Filters(pub(crate) Vec<AuditFilter>);
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct AuditFilter {
     /// The record type to filter.
-    pub record_type: String,
+    pub record_type: RecordType,
     /// The action to take on the record type.
     pub action: FilterAction,
 }

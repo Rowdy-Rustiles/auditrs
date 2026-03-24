@@ -142,7 +142,7 @@ impl RecordTypeAutoCompleter {
                 SkimMatcherV2::default()
                     .smart_case()
                     .fuzzy_match(record_type.as_audit_str(), input)
-                    .map(|score| (record_type.as_audit_str().to_string().to_lowercase(), score))
+                    .map(|score| (record_type.as_audit_str().to_string(), score))
             })
             .collect();
 

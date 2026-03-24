@@ -5,7 +5,7 @@ use inquire::Select;
 use inquire::validator::Validation;
 use std::fs;
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use toml;
@@ -26,7 +26,7 @@ use crate::utils::{
 impl Filters {
     /// Returns the list of record types currently defined in the filters (for
     /// autocomplete).
-    pub fn record_types(&self) -> Vec<String> {
+    pub fn record_types(&self) -> Vec<RecordType> {
         self.0.iter().map(|f| f.record_type.clone()).collect()
     }
 
@@ -37,10 +37,18 @@ impl Filters {
 
     /// Load filters from the dedicated rules file defined in the config
     /// (default: `/etc/auditrs/rules.toml`).
-    pub fn load() -> Result<Filters> {
-        let file_path = RULES_FILE;
+    ///
+    /// **Parameters**
+    ///
+    /// * path - Optional path to rules file (used for unit testing)
+    pub fn load(path: Option<PathBuf>) -> Result<Filters> {
+        let file_path = if path.is_some() {
+            path.unwrap()
+        } else {
+            Path::new(RULES_FILE).to_path_buf()
+        };
 
-        if !Path::new(file_path).exists() {
+        if !file_path.exists() {
             // No filters file yet – treat as empty set of filters.
             eprintln!("Filters file not found at {RULES_FILE}, creating empty rules file");
             let filters = Filters(Vec::new());
@@ -61,7 +69,8 @@ impl Filters {
                 arr.iter()
                     .filter_map(|v| v.as_table())
                     .filter_map(|table| {
-                        let record_type = table.get("record_type")?.as_str()?.to_string();
+                        let record_type =
+                            RecordType::from_str(table.get("record_type")?.as_str()?).ok()?;
                         let action_str = table.get("action")?.as_str()?.to_string();
                         let action = FilterAction::from_str(&action_str.to_lowercase()).ok()?;
                         Some(AuditFilter {
@@ -79,7 +88,7 @@ impl Filters {
 
 /// Free function used by the shared state loader.
 pub fn load_filters() -> Result<Filters> {
-    Filters::load()
+    Filters::load(None)
 }
 
 /// Persist the provided filters into the shared rules file (`rules.toml`),
@@ -111,7 +120,7 @@ fn persist_filters(filters: &[AuditFilter]) -> Result<()> {
             let mut table = toml::map::Map::new();
             table.insert(
                 "record_type".into(),
-                toml::Value::String(f.record_type.clone()),
+                toml::Value::String(f.record_type.as_audit_str().to_string()),
             );
             table.insert(
                 "action".into(),
@@ -168,11 +177,13 @@ fn set_filter(filter: AuditFilter) -> Result<()> {
 /// **Parameters:**
 ///
 /// * `record_type`: Record type identifier to remove filters for.
-fn remove_filter(record_type: &str) -> Result<()> {
+fn remove_filter(record_type: &RecordType) -> Result<()> {
     let mut current = load_filters()?;
-    current
-        .0
-        .retain(|f| !f.record_type.eq_ignore_ascii_case(record_type));
+    current.0.retain(|f| {
+        !f.record_type
+            .as_audit_str()
+            .eq_ignore_ascii_case(record_type.as_audit_str())
+    });
     persist_filters(&current.0)
 }
 
@@ -188,7 +199,11 @@ pub fn get_filters(state: &State) -> Result<()> {
     } else {
         println!("Filters:");
         for filter in filters {
-            println!("    {}: {}", filter.record_type, filter.action.as_ref());
+            println!(
+                "    {}: {}",
+                filter.record_type.as_audit_str(),
+                filter.action.as_ref()
+            );
         }
     }
     Ok(())
@@ -204,7 +219,7 @@ pub fn get_filters(state: &State) -> Result<()> {
 /// * `_state`: Currently unused, included for symmetry with other interactive
 ///   commands that may need shared state.
 pub fn add_filter_interactive(_state: &State) -> Result<()> {
-    let record_type = inquire::Text::new("Enter a record type to filter on:")
+    let record_type_str = inquire::Text::new("Enter a record type to filter on:")
         .with_autocomplete(RecordTypeAutoCompleter::default())
         .with_validator(|input: &str| {
             let is_valid = RecordType::iter()
@@ -218,16 +233,16 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
                 ))
             }
         })
-        .with_formatter(&|i| i.to_lowercase())
         .with_page_size(12)
         .prompt()?
         .trim()
-        .to_string()
-        .to_lowercase();
+        .to_string();
 
-    if record_type.is_empty() {
+    if record_type_str.is_empty() {
         return Err(anyhow!("record type cannot be empty"));
     }
+
+    let record_type = RecordType::from_str(&record_type_str)?;
 
     let actions: Vec<String> = FilterAction::iter()
         .map(|a| a.as_ref().to_string())
@@ -252,12 +267,18 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
 ///
 /// * `state`: Shared application `State` used to obtain existing `Filters`.
 pub fn remove_filter_interactive(state: &State) -> Result<()> {
-    let existing = state.rules.filters.record_types();
+    let existing: Vec<String> = state
+        .rules
+        .filters
+        .record_types()
+        .iter_mut()
+        .map(|record| record.as_audit_str().to_string())
+        .collect();
     if existing.is_empty() {
         return Err(anyhow!("No filters defined; nothing to remove."));
     }
     let completer = StringListAutoCompleter::new(existing.clone());
-    let record_type = inquire::Text::new("Select a record type to remove:")
+    let record_type_str = inquire::Text::new("Select a record type to remove:")
         .with_autocomplete(completer)
         .with_validator(move |input: &str| {
             let trimmed = input.trim().to_lowercase();
@@ -274,8 +295,9 @@ pub fn remove_filter_interactive(state: &State) -> Result<()> {
         .with_page_size(12)
         .prompt()?
         .trim()
-        .to_string()
-        .to_lowercase();
+        .to_string();
+
+    let record_type = RecordType::from_str(&record_type_str)?;
 
     remove_filter(&record_type)
 }
@@ -290,14 +312,21 @@ pub fn remove_filter_interactive(state: &State) -> Result<()> {
 ///
 /// * `state`: Shared application `State` used to obtain and update `Filters`.
 pub fn update_filter_interactive(state: &State) -> Result<()> {
-    let existing = state.rules.filters.record_types();
+    let existing: Vec<String> = state
+        .rules
+        .filters
+        .record_types()
+        .iter_mut()
+        .map(|record| record.as_audit_str().to_string())
+        .collect();
+
     if existing.is_empty() {
         return Err(anyhow!(
             "No filters defined; add a filter first or use 'filter add'."
         ));
     }
     let completer = StringListAutoCompleter::new(existing.clone());
-    let record_type = inquire::Text::new("Select a record type to update:")
+    let record_type_str = inquire::Text::new("Select a record type to update:")
         .with_autocomplete(completer)
         .with_validator(move |input: &str| {
             let trimmed = input.trim().to_lowercase();
@@ -314,8 +343,9 @@ pub fn update_filter_interactive(state: &State) -> Result<()> {
         .with_page_size(12)
         .prompt()?
         .trim()
-        .to_string()
-        .to_lowercase();
+        .to_string();
+
+    let record_type = RecordType::from_str(&record_type_str)?;
 
     let actions: Vec<String> = FilterAction::iter()
         .map(|a| a.as_ref().to_string())
@@ -371,7 +401,7 @@ fn validate_and_build_filter(
     })?;
 
     Ok(AuditFilter {
-        record_type: parsed_rt.as_audit_str().to_lowercase(),
+        record_type: parsed_rt,
         action: parsed_action,
     })
 }
@@ -593,7 +623,7 @@ fn to_toml_format(filters: &[AuditFilter]) -> Result<String> {
                     let mut filter_table = toml::map::Map::new();
                     filter_table.insert(
                         "record_type".into(),
-                        toml::Value::String(f.record_type.clone()),
+                        toml::Value::String(f.record_type.as_audit_str().to_string()),
                     );
                     filter_table.insert(
                         "action".into(),
@@ -617,9 +647,70 @@ fn to_ars_format(filters: &[AuditFilter]) -> Result<String> {
     for filter in filters {
         content.push_str(&format!(
             "{}: {}\n",
-            filter.record_type,
+            filter.record_type.as_audit_str(),
             filter.action.as_ref()
         ));
     }
     Ok(content)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+    use crate::core::parser::audit_types;
+
+    fn create_test_rules_file() -> PathBuf {
+        std::fs::create_dir_all(std::path::Path::new("./tmp")).unwrap();
+        let mut rules_file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(false)
+            .truncate(true)
+            .write(true)
+            .read(true)
+            .open(std::path::Path::new("./tmp/rules.toml"))
+            .unwrap();
+
+        let test_rules: &str = r#"
+        [[filters]]
+        action = "block"
+        record_type = "SYSCALL"
+
+        [[filters]]
+        action = "allow"
+        record_type = "ADD_GROUP"
+
+        [[filters]]
+        action = "block"
+        record_type = "CWD"
+        "#;
+
+        rules_file.write(test_rules.as_bytes()).unwrap();
+        rules_file.flush().unwrap();
+
+        std::path::Path::new("./tmp/rules.toml").to_path_buf()
+    }
+
+    #[test]
+    fn filter_constructor() {
+        let rules_path = create_test_rules_file();
+        let loaded_filters = Filters::load(Some(rules_path));
+        if let Ok(filters_wrapper) = loaded_filters {
+            let filters = filters_wrapper.0;
+
+            assert!(
+                filters[0].action == FilterAction::Block
+                    && filters[0].record_type == RecordType::Syscall
+            );
+            assert!(
+                filters[1].action == FilterAction::Allow
+                    && filters[1].record_type == RecordType::AddGroup
+            );
+            assert!(
+                filters[2].action == FilterAction::Block
+                    && filters[2].record_type == RecordType::Cwd
+            );
+        }
+    }
 }

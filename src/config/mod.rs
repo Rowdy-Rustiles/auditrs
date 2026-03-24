@@ -32,17 +32,6 @@ pub const CONFIG_FILE: &str = "/etc/auditrs/config.toml";
 pub const RULES_FILE: &str = "/etc/auditrs/rules.toml";
 /// The file extensions that can be used for importing and dumping filters.
 pub const FILTER_FILE_EXTENSIONS: &[&str] = &["toml", "ars"];
-/// The actions available for filters and watches.
-pub const FILTER_ACTIONS: &[&str] = &[
-    "allow",
-    "block",
-    "sample",
-    "redact",
-    "route_secondary",
-    "tag",
-    "count_only",
-    "alert",
-];
 /// The log formats for the auditrs output logs.
 pub const LOG_FORMATS: &[&str] = &["Legacy", "Simple", "Json"];
 /// The default configuration for the auditrs daemon.
