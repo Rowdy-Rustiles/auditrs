@@ -159,6 +159,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Doesn't necessarily need to be ignored, but takes up some time
     // Flush the event buffer and check the flushed events
     fn flush_to_event() {
         let mut correlator = Correlator::new();

@@ -656,10 +656,9 @@ fn to_ars_format(filters: &[AuditFilter]) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
     use super::*;
-    use crate::core::parser::audit_types;
+    use serial_test::serial;
+    use std::io::Write;
 
     fn create_test_rules_file() -> PathBuf {
         std::fs::create_dir_all(std::path::Path::new("./tmp")).unwrap();
@@ -686,8 +685,10 @@ mod tests {
         record_type = "CWD"
         "#;
 
-        rules_file.write(test_rules.as_bytes()).unwrap();
-        rules_file.flush().unwrap();
+        if rules_file.metadata().unwrap().len() == 0 {
+            rules_file.write(test_rules.as_bytes()).unwrap();
+            rules_file.flush().unwrap();
+        }
 
         std::path::Path::new("./tmp/rules.toml").to_path_buf()
     }
@@ -712,5 +713,458 @@ mod tests {
                     && filters[2].record_type == RecordType::Cwd
             );
         }
+    }
+
+    #[test]
+    fn helper_methods() {
+        let rules_path = create_test_rules_file();
+        let loaded_filters = Filters::load(Some(rules_path));
+        if let Ok(filters_wrapper) = loaded_filters {
+            // Check that the returned record type vec contains the expected record types
+            assert!(filters_wrapper.record_types().iter().all(|rt| {
+                rt == &RecordType::Syscall || rt == &RecordType::AddGroup || rt == &RecordType::Cwd
+            }));
+            assert!(filters_wrapper.as_slice().len() == 3);
+        }
+    }
+
+    #[test]
+    fn load_empty_file() {
+        std::fs::create_dir_all("./tmp").unwrap();
+        let path = PathBuf::from("./tmp/empty_rules.toml");
+        std::fs::write(&path, "").unwrap();
+        let filters = Filters::load(Some(path)).unwrap();
+        assert!(filters.as_slice().is_empty());
+    }
+
+    #[test]
+    fn load_no_filters_section() {
+        std::fs::create_dir_all("./tmp").unwrap();
+        let path = PathBuf::from("./tmp/no_filters_section.toml");
+        std::fs::write(&path, "[watches]\n").unwrap();
+        let filters = Filters::load(Some(path)).unwrap();
+        assert!(filters.as_slice().is_empty());
+    }
+
+    #[test]
+    fn validate_and_build_filter_valid() {
+        let f = validate_and_build_filter("SYSCALL", "block", "test").unwrap();
+        assert_eq!(f.record_type, RecordType::Syscall);
+        assert_eq!(f.action, FilterAction::Block);
+    }
+
+    #[test]
+    fn validate_and_build_filter_case_insensitive() {
+        let f = validate_and_build_filter("syscall", "ALLOW", "test").unwrap();
+        assert_eq!(f.record_type, RecordType::Syscall);
+        assert_eq!(f.action, FilterAction::Allow);
+    }
+
+    #[test]
+    fn validate_and_build_filter_with_whitespace() {
+        let f = validate_and_build_filter("  SYSCALL  ", "  block  ", "test").unwrap();
+        assert_eq!(f.record_type, RecordType::Syscall);
+        assert_eq!(f.action, FilterAction::Block);
+    }
+
+    #[test]
+    fn validate_and_build_filter_empty_record_type() {
+        let err = validate_and_build_filter("", "block", "loc").unwrap_err();
+        assert!(err.to_string().contains("record_type is empty"));
+    }
+
+    #[test]
+    fn validate_and_build_filter_empty_action() {
+        let err = validate_and_build_filter("SYSCALL", "", "loc").unwrap_err();
+        assert!(err.to_string().contains("action is empty"));
+    }
+
+    #[test]
+    fn validate_and_build_filter_unknown_record_type() {
+        let err = validate_and_build_filter("NOT_A_TYPE", "block", "loc").unwrap_err();
+        assert!(err.to_string().contains("unknown record type"));
+    }
+
+    #[test]
+    fn validate_and_build_filter_invalid_action() {
+        let err = validate_and_build_filter("SYSCALL", "destroy", "loc").unwrap_err();
+        assert!(err.to_string().contains("invalid action"));
+    }
+
+    #[test]
+    fn import_from_toml_valid() {
+        let content = r#"
+            [[filters]]
+            record_type = "SYSCALL"
+            action = "block"
+
+            [[filters]]
+            record_type = "CWD"
+            action = "allow"
+        "#;
+        let path = Path::new("test.toml");
+        let filters = import_from_toml(content, path).unwrap();
+        assert_eq!(filters.len(), 2);
+        assert_eq!(filters[0].record_type, RecordType::Syscall);
+        assert_eq!(filters[0].action, FilterAction::Block);
+        assert_eq!(filters[1].record_type, RecordType::Cwd);
+        assert_eq!(filters[1].action, FilterAction::Allow);
+    }
+
+    #[test]
+    fn import_from_toml_missing_filters_section() {
+        let content = r#"[watches]"#;
+        let path = Path::new("test.toml");
+        let err = import_from_toml(content, path).unwrap_err();
+        assert!(err.to_string().contains("missing [[filters]] array"));
+    }
+
+    #[test]
+    fn import_from_toml_skips_missing_fields() {
+        let content = r#"
+            [[filters]]
+            record_type = "SYSCALL"
+
+            [[filters]]
+            action = "block"
+
+            [[filters]]
+            record_type = "CWD"
+            action = "allow"
+        "#;
+        let path = Path::new("test.toml");
+        let filters = import_from_toml(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+        assert_eq!(filters[0].record_type, RecordType::Cwd);
+    }
+
+    #[test]
+    fn import_from_toml_skips_unknown_record_type() {
+        let content = r#"
+            [[filters]]
+            record_type = "BOGUS_TYPE"
+            action = "block"
+
+            [[filters]]
+            record_type = "SYSCALL"
+            action = "allow"
+        "#;
+        let path = Path::new("test.toml");
+        let filters = import_from_toml(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+        assert_eq!(filters[0].record_type, RecordType::Syscall);
+    }
+
+    #[test]
+    fn import_from_toml_with_block_comments() {
+        let content = r#"
+            /* This is a block comment */
+            [[filters]]
+            record_type = "SYSCALL"
+            action = "block"
+        "#;
+        let path = Path::new("test.toml");
+        let filters = import_from_toml(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+        assert_eq!(filters[0].record_type, RecordType::Syscall);
+    }
+
+    #[test]
+    fn import_from_ars_valid() {
+        let content = "SYSCALL: block\nCWD: allow\n";
+        let path = Path::new("test.ars");
+        let filters = import_from_ars(content, path).unwrap();
+        assert_eq!(filters.len(), 2);
+        assert_eq!(filters[0].record_type, RecordType::Syscall);
+        assert_eq!(filters[0].action, FilterAction::Block);
+        assert_eq!(filters[1].record_type, RecordType::Cwd);
+        assert_eq!(filters[1].action, FilterAction::Allow);
+    }
+
+    #[test]
+    fn import_from_ars_skips_blank_lines() {
+        let content = "\n\nSYSCALL: block\n\n\n";
+        let path = Path::new("test.ars");
+        let filters = import_from_ars(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+    }
+
+    #[test]
+    fn import_from_ars_skips_invalid_syntax() {
+        let content = "SYSCALL block\nCWD: allow\n";
+        let path = Path::new("test.ars");
+        let filters = import_from_ars(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+        assert_eq!(filters[0].record_type, RecordType::Cwd);
+    }
+
+    #[test]
+    fn import_from_ars_skips_unknown_record_type() {
+        let content = "FAKE_TYPE: block\nSYSCALL: allow\n";
+        let path = Path::new("test.ars");
+        let filters = import_from_ars(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+        assert_eq!(filters[0].record_type, RecordType::Syscall);
+    }
+
+    #[test]
+    fn import_from_ars_with_block_comments() {
+        let content = "/* comment */\nSYSCALL: block\n";
+        let path = Path::new("test.ars");
+        let filters = import_from_ars(content, path).unwrap();
+        assert_eq!(filters.len(), 1);
+    }
+
+    #[test]
+    fn to_toml_format_roundtrip() {
+        let filters = vec![
+            AuditFilter {
+                record_type: RecordType::Syscall,
+                action: FilterAction::Block,
+            },
+            AuditFilter {
+                record_type: RecordType::Cwd,
+                action: FilterAction::Allow,
+            },
+        ];
+
+        let toml_str = to_toml_format(&filters).unwrap();
+        let reimported = import_from_toml(&toml_str, Path::new("roundtrip.toml")).unwrap();
+        assert_eq!(reimported.len(), 2);
+        assert_eq!(reimported[0].record_type, RecordType::Syscall);
+        assert_eq!(reimported[0].action, FilterAction::Block);
+        assert_eq!(reimported[1].record_type, RecordType::Cwd);
+        assert_eq!(reimported[1].action, FilterAction::Allow);
+    }
+
+    #[test]
+    fn to_ars_format_roundtrip() {
+        let filters = vec![
+            AuditFilter {
+                record_type: RecordType::Syscall,
+                action: FilterAction::Block,
+            },
+            AuditFilter {
+                record_type: RecordType::AddGroup,
+                action: FilterAction::Allow,
+            },
+        ];
+
+        let ars_str = to_ars_format(&filters).unwrap();
+        let reimported = import_from_ars(&ars_str, Path::new("roundtrip.ars")).unwrap();
+        assert_eq!(reimported.len(), 2);
+        assert_eq!(reimported[0].record_type, RecordType::Syscall);
+        assert_eq!(reimported[0].action, FilterAction::Block);
+        assert_eq!(reimported[1].record_type, RecordType::AddGroup);
+        assert_eq!(reimported[1].action, FilterAction::Allow);
+    }
+
+    #[test]
+    fn to_ars_format_content() {
+        let filters = vec![AuditFilter {
+            record_type: RecordType::Syscall,
+            action: FilterAction::Block,
+        }];
+        let ars_str = to_ars_format(&filters).unwrap();
+        assert_eq!(ars_str, "SYSCALL: block\n");
+    }
+
+    #[test]
+    fn to_toml_format_contains_filters_key() {
+        let filters = vec![AuditFilter {
+            record_type: RecordType::Syscall,
+            action: FilterAction::Block,
+        }];
+        let toml_str = to_toml_format(&filters).unwrap();
+        assert!(toml_str.contains("[[filters]]"));
+        assert!(toml_str.contains("SYSCALL"));
+        assert!(toml_str.contains("block"));
+    }
+
+    #[test]
+    fn to_toml_format_empty() {
+        let toml_str = to_toml_format(&[]).unwrap();
+        assert!(toml_str.contains("filters"));
+        let reimported = import_from_toml(&toml_str, Path::new("empty.toml")).unwrap();
+        assert!(reimported.is_empty());
+    }
+
+    #[test]
+    fn to_ars_format_empty() {
+        let ars_str = to_ars_format(&[]).unwrap();
+        assert!(ars_str.is_empty());
+    }
+
+    #[test]
+    fn import_filters_file_not_found() {
+        let err = import_filters("/nonexistent/path/rules.toml").unwrap_err();
+        assert!(err.to_string().contains("file does not exist"));
+    }
+
+    #[test]
+    fn import_filters_unsupported_extension() {
+        std::fs::create_dir_all("./tmp").unwrap();
+        let path = "./tmp/rules.json";
+        std::fs::write(path, "{}").unwrap();
+        let err = import_filters(path).unwrap_err();
+        assert!(err.to_string().contains("unsupported file extension"));
+    }
+
+    #[test]
+    fn import_filters_empty_toml_prints_no_filters() {
+        std::fs::create_dir_all("./tmp").unwrap();
+        let content = "[[filters]]\n";
+        let path = Path::new("./tmp/import_empty_msg.toml");
+        std::fs::write(path, content).unwrap();
+        let filters = import_from_toml(content, path).unwrap();
+        assert!(filters.is_empty());
+    }
+
+    #[test]
+    fn validate_all_filter_actions() {
+        let actions = [
+            "allow",
+            "block",
+            "sample",
+            "redact",
+            "route_secondary",
+            "tag",
+            "count_only",
+            "alert",
+        ];
+        for action in &actions {
+            let f = validate_and_build_filter("SYSCALL", action, "test").unwrap();
+            assert_eq!(f.record_type, RecordType::Syscall);
+            assert_eq!(f.action.as_ref(), *action);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn import_filters_toml_file() {
+        std::fs::create_dir_all("./tmp").unwrap();
+        let content = r#"
+            [[filters]]
+            record_type = "SYSCALL"
+            action = "block"
+        "#;
+        let path = "./tmp/import_test.toml";
+        std::fs::write(path, content).unwrap();
+        import_filters(path).unwrap();
+
+        let loaded = load_filters().unwrap();
+        assert!(
+            loaded
+                .as_slice()
+                .iter()
+                .any(|f| f.record_type == RecordType::Syscall && f.action == FilterAction::Block)
+        );
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn import_filters_ars_file() {
+        std::fs::create_dir_all("./tmp").unwrap();
+        let path = "./tmp/import_test.ars";
+        std::fs::write(path, "SYSCALL: block\n").unwrap();
+        import_filters(path).unwrap();
+
+        let loaded = load_filters().unwrap();
+        assert!(
+            loaded
+                .as_slice()
+                .iter()
+                .any(|f| f.record_type == RecordType::Syscall && f.action == FilterAction::Block)
+        );
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn set_filter_inserts_new() {
+        let filter = AuditFilter {
+            record_type: RecordType::Execve,
+            action: FilterAction::Allow,
+        };
+        set_filter(filter).unwrap();
+
+        let loaded = load_filters().unwrap();
+        assert!(
+            loaded
+                .as_slice()
+                .iter()
+                .any(|f| f.record_type == RecordType::Execve && f.action == FilterAction::Allow)
+        );
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn set_filter_updates_existing() {
+        let filter = AuditFilter {
+            record_type: RecordType::Execve,
+            action: FilterAction::Block,
+        };
+        set_filter(filter).unwrap();
+
+        let updated = AuditFilter {
+            record_type: RecordType::Execve,
+            action: FilterAction::Allow,
+        };
+        set_filter(updated).unwrap();
+
+        let loaded = load_filters().unwrap();
+        let matching: Vec<_> = loaded
+            .as_slice()
+            .iter()
+            .filter(|f| f.record_type == RecordType::Execve)
+            .collect();
+        assert_eq!(matching.len(), 1);
+        assert_eq!(matching[0].action, FilterAction::Allow);
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn remove_filter_removes_existing() {
+        let filter = AuditFilter {
+            record_type: RecordType::Execve,
+            action: FilterAction::Block,
+        };
+        set_filter(filter).unwrap();
+        remove_filter(&RecordType::Execve).unwrap();
+
+        let loaded = load_filters().unwrap();
+        assert!(
+            !loaded
+                .as_slice()
+                .iter()
+                .any(|f| f.record_type == RecordType::Execve)
+        );
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn persist_filters_preserves_watches_section() {
+        let filters = vec![AuditFilter {
+            record_type: RecordType::Syscall,
+            action: FilterAction::Block,
+        }];
+        persist_filters(&filters).unwrap();
+
+        let content = std::fs::read_to_string(RULES_FILE).unwrap();
+        assert!(content.contains("watches"));
+        assert!(content.contains("[[filters]]"));
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn load_filters_from_system_path() {
+        let loaded = load_filters();
+        assert!(loaded.is_ok());
     }
 }

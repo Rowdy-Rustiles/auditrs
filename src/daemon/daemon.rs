@@ -209,6 +209,7 @@ impl Drop for FileGuard {
     }
 }
 
+// Some of these need to be rewritten alongside the pid path refactor
 #[cfg(test)]
 mod test {
     use super::*;
