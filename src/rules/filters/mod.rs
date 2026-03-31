@@ -16,12 +16,15 @@
 mod filters;
 
 pub use filters::{
+    add_filter,
     add_filter_interactive,
     dump_filters,
     get_filters,
     import_filters,
     load_filters,
+    remove_filter_by_record_type,
     remove_filter_interactive,
+    update_filter,
     update_filter_interactive,
 };
 

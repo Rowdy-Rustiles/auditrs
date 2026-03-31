@@ -112,7 +112,11 @@ pub enum SetConfigVariables {
     /// Set the primary size for the auditrs daemon.
     PrimarySize,
     /// Set the log format for the auditrs daemon.
-    LogFormat,
+    LogFormat {
+        /// The new log format (legacy, simple, json). If omitted, the CLI may
+        /// fall back to an interactive prompt.
+        value: Option<String>,
+    },
 }
 
 /// An enum for the different log formats that can be used by the auditrs

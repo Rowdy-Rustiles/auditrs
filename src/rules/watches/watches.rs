@@ -267,6 +267,103 @@ pub fn add_watch_interactive() -> Result<()> {
     set_watch(watch)
 }
 
+/// Add a single watch non-interactively (usable from one-shot CLI flags).
+///
+/// Validates:
+/// - `path` exists
+/// - `actions` is non-empty
+/// - `recursive` can only be true for directories
+pub fn add_watch(path: &str, actions: Vec<WatchAction>, recursive: bool) -> Result<()> {
+    let path = path.trim();
+    if path.is_empty() {
+        return Err(anyhow!("path cannot be empty"));
+    }
+    if !Path::new(path).exists() {
+        return Err(anyhow!("path does not exist: {}", path));
+    }
+    if recursive && !Path::new(path).is_dir() {
+        return Err(anyhow!(
+            "recursive watches are only valid for directories: {}",
+            path
+        ));
+    }
+
+    let watch_path = absolute(path)
+        .with_context(|| format!("failed to resolve absolute path for '{}'", path))?;
+    let watch = validate_and_build_watch(
+        &watch_path.to_string_lossy(),
+        actions,
+        recursive,
+        "watch add",
+    )?;
+
+    execute_watch_auditctl_command(&watch, false)?;
+    set_watch(watch)
+}
+
+/// Remove a watch by its key non-interactively.
+pub fn remove_watch_by_key(state: &State, key: &str) -> Result<()> {
+    let key = key.trim();
+    if key.is_empty() {
+        return Err(anyhow!("key cannot be empty"));
+    }
+
+    let watches = &state.rules.watches.0;
+    let watch = watches
+        .iter()
+        .find(|w| w.key == key)
+        .ok_or_else(|| anyhow!("watch with key '{}' not found", key))?;
+
+    execute_watch_auditctl_command(watch, true)?;
+    remove_watch(key)
+}
+
+/// Update an existing watch by key non-interactively.
+///
+/// Unlike the interactive updater, this updates both the persisted rules file
+/// and the live kernel rule (via auditctl).
+pub fn update_watch_by_key(
+    state: &State,
+    key: &str,
+    actions: Vec<WatchAction>,
+    recursive: Option<bool>,
+) -> Result<()> {
+    let key = key.trim();
+    if key.is_empty() {
+        return Err(anyhow!("key cannot be empty"));
+    }
+    if actions.is_empty() {
+        return Err(anyhow!("actions cannot be empty"));
+    }
+
+    let watches = &state.rules.watches.0;
+    let old_watch = watches
+        .iter()
+        .find(|w| w.key == key)
+        .ok_or_else(|| anyhow!("watch with key '{}' not found", key))?;
+
+    let new_recursive = recursive.unwrap_or(old_watch.recursive);
+    if new_recursive && !old_watch.path.is_dir() {
+        return Err(anyhow!(
+            "recursive watches are only valid for directories: {}",
+            old_watch.path.to_string_lossy()
+        ));
+    }
+
+    let new_key = generate_watch_key(&old_watch.path, &actions, new_recursive);
+    let new_watch = AuditWatch {
+        path: old_watch.path.clone(),
+        actions,
+        recursive: new_recursive,
+        key: new_key,
+    };
+
+    // Update live kernel rule first (remove old, add new), then persist.
+    execute_watch_auditctl_command(old_watch, true)?;
+    execute_watch_auditctl_command(&new_watch, false)?;
+    update_watch(key, new_watch)
+}
+
 /// Gets all watches from the watches file using the pre-loaded state.
 ///
 /// **Parameters:**

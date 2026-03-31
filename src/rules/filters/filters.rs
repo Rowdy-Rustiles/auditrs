@@ -257,6 +257,89 @@ pub fn add_filter_interactive(_state: &State) -> Result<()> {
     set_filter(filter)
 }
 
+/// Add a single filter non-interactively (usable from one-shot CLI flags).
+///
+/// Validates that the provided `record_type` matches a known `RecordType`, and
+/// that the provided `action` matches a known `FilterAction`.
+pub fn add_filter(record_type: &str, action: &str) -> Result<()> {
+    let record_type = record_type.trim();
+    if record_type.is_empty() {
+        return Err(anyhow!("record type cannot be empty"));
+    }
+
+    let is_valid_record_type = RecordType::iter()
+        .any(|rt| rt.as_audit_str().eq_ignore_ascii_case(record_type));
+    if !is_valid_record_type {
+        return Err(anyhow!(
+            "invalid record type '{}'; use a known record type",
+            record_type
+        ));
+    }
+    let record_type = RecordType::from_str(record_type)?;
+
+    let action = action.trim();
+    if action.is_empty() {
+        return Err(anyhow!("action cannot be empty"));
+    }
+    let action = FilterAction::from_str(&action.to_lowercase())?;
+
+    set_filter(AuditFilter { record_type, action })
+}
+
+/// Update an existing filter non-interactively.
+///
+/// This is stricter than `add_filter()` in that it requires the filter to
+/// already exist in the current rules set (mirrors the interactive "update"
+/// flow which selects from existing filters).
+pub fn update_filter(state: &State, record_type: &str, action: &str) -> Result<()> {
+    let record_type_trimmed = record_type.trim();
+    if record_type_trimmed.is_empty() {
+        return Err(anyhow!("record type cannot be empty"));
+    }
+
+    let exists = state
+        .rules
+        .filters
+        .as_slice()
+        .iter()
+        .any(|f| f.record_type.as_audit_str().eq_ignore_ascii_case(record_type_trimmed));
+    if !exists {
+        return Err(anyhow!(
+            "no existing filter for record type '{}'; use 'filter add' instead",
+            record_type_trimmed
+        ));
+    }
+
+    add_filter(record_type_trimmed, action)
+}
+
+/// Remove an existing filter non-interactively.
+///
+/// Requires the filter to exist (mirrors interactive remove which selects from
+/// existing filters).
+pub fn remove_filter_by_record_type(state: &State, record_type: &str) -> Result<()> {
+    let record_type_trimmed = record_type.trim();
+    if record_type_trimmed.is_empty() {
+        return Err(anyhow!("record type cannot be empty"));
+    }
+
+    let exists = state
+        .rules
+        .filters
+        .as_slice()
+        .iter()
+        .any(|f| f.record_type.as_audit_str().eq_ignore_ascii_case(record_type_trimmed));
+    if !exists {
+        return Err(anyhow!(
+            "no existing filter for record type '{}'",
+            record_type_trimmed
+        ));
+    }
+
+    let record_type = RecordType::from_str(record_type_trimmed)?;
+    remove_filter(&record_type)
+}
+
 /// Remove a filter via interactive prompt with fuzzy autocomplete over existing
 /// filters only.
 ///

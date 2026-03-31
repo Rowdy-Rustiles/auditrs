@@ -8,12 +8,15 @@
 mod watches;
 
 pub use watches::{
+    add_watch,
     add_watch_interactive,
     dump_watches,
     get_watches,
     import_watches,
     load_watches,
+    remove_watch_by_key,
     remove_watch_interactive,
+    update_watch_by_key,
     update_watch_interactive,
 };
 

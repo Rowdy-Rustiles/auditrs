@@ -9,6 +9,7 @@
 
 use anyhow::{Context, Result};
 use clap::ArgMatches;
+use std::str::FromStr;
 
 use crate::config::{GetConfigVariables, SetConfigVariables, get_config, set_config};
 use crate::daemon::control::{
@@ -19,7 +20,9 @@ use crate::daemon::control::{
     stop_auditrs,
 };
 use crate::rules::{
+    add_filter,
     add_filter_interactive,
+    add_watch,
     add_watch_interactive,
     dump_filters,
     dump_watches,
@@ -27,8 +30,12 @@ use crate::rules::{
     get_watches,
     import_filters,
     import_watches,
+    remove_filter_by_record_type,
+    remove_watch_by_key,
     remove_filter_interactive,
     remove_watch_interactive,
+    update_filter,
+    update_watch_by_key,
     update_filter_interactive,
     update_watch_interactive,
 };
@@ -127,7 +134,10 @@ fn handle_config(matches: &ArgMatches) -> Result<()> {
 /// * `matches`: CLI argument for the config option being set.
 fn handle_config_set(matches: &ArgMatches) -> Result<()> {
     let result = match matches.subcommand() {
-        Some(("format", _m)) => set_config(SetConfigVariables::LogFormat),
+        Some(("format", m)) => {
+            let value = m.get_one::<String>("value").cloned();
+            set_config(SetConfigVariables::LogFormat { value })
+        }
         Some(("log-directory", m)) => {
             let value = m
                 .get_one::<String>("value")
@@ -174,22 +184,44 @@ fn handle_config_set(matches: &ArgMatches) -> Result<()> {
 fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_filters(state),
-        Some(("add", _sub_m)) => {
-            let result = add_filter_interactive(state);
+        Some(("add", sub_m)) => {
+            let record_type = sub_m.get_one::<String>("record_type").cloned();
+            let action = sub_m.get_one::<String>("action").cloned();
+
+            let result = match (record_type, action) {
+                (Some(rt), Some(a)) => add_filter(&rt, &a),
+                (None, None) => add_filter_interactive(state),
+                _ => Err(anyhow::anyhow!(
+                    "non-interactive usage requires both --record-type and --action"
+                )),
+            };
             if result.is_ok() {
                 reload_auditrs()?;
             }
             result
         }
-        Some(("update", _sub_m)) => {
-            let result = update_filter_interactive(state);
+        Some(("update", sub_m)) => {
+            let record_type = sub_m.get_one::<String>("record_type").cloned();
+            let action = sub_m.get_one::<String>("action").cloned();
+
+            let result = match (record_type, action) {
+                (Some(rt), Some(a)) => update_filter(state, &rt, &a),
+                (None, None) => update_filter_interactive(state),
+                _ => Err(anyhow::anyhow!(
+                    "non-interactive usage requires both --record-type and --action"
+                )),
+            };
             if result.is_ok() {
                 reload_auditrs()?;
             }
             result
         }
-        Some(("remove", _sub_m)) => {
-            let result = remove_filter_interactive(state);
+        Some(("remove", sub_m)) => {
+            let value = sub_m.get_one::<String>("value").cloned();
+            let result = match value {
+                Some(record_type) => remove_filter_by_record_type(state, &record_type),
+                None => remove_filter_interactive(state),
+            };
             if result.is_ok() {
                 reload_auditrs()?;
             }
@@ -225,22 +257,69 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
 fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
     match matches.subcommand() {
         Some(("get", _sub_m)) => get_watches(state),
-        Some(("add", _sub_m)) => {
-            let result = add_watch_interactive();
+        Some(("add", sub_m)) => {
+            let path = sub_m.get_one::<String>("path").cloned();
+            let actions = sub_m.get_many::<String>("action").map(|vals| {
+                vals.map(|s| s.to_string()).collect::<Vec<String>>()
+            });
+            let recursive = sub_m.get_one::<bool>("recursive").copied().unwrap_or(false);
+
+            let result = match (path, actions) {
+                (Some(p), Some(a)) => {
+                    let actions = a
+                        .iter()
+                        .map(|s| crate::rules::WatchAction::from_str(&s.to_lowercase())
+                            .map_err(anyhow::Error::from))
+                        .collect::<Result<Vec<_>>>()?;
+                    add_watch(&p, actions, recursive)
+                }
+                (None, None) => add_watch_interactive(),
+                _ => Err(anyhow::anyhow!(
+                    "non-interactive usage requires PATH and at least one --action"
+                )),
+            };
             if result.is_ok() {
                 reload_auditrs()?;
             }
             result
         }
-        Some(("update", _sub_m)) => {
-            let result = update_watch_interactive(state);
+        Some(("update", sub_m)) => {
+            let key = sub_m.get_one::<String>("key").cloned();
+            let actions = sub_m.get_many::<String>("action").map(|vals| {
+                vals.map(|s| s.to_string()).collect::<Vec<String>>()
+            });
+            let recursive = sub_m
+                .get_one::<String>("recursive")
+                .map(|s| s.eq_ignore_ascii_case("true"));
+
+            let result = match (key, actions) {
+                (Some(k), Some(a)) => {
+                    let actions = a
+                        .iter()
+                        .map(|s| crate::rules::WatchAction::from_str(&s.to_lowercase())
+                            .map_err(anyhow::Error::from))
+                        .collect::<Result<Vec<_>>>()?;
+                    update_watch_by_key(state, &k, actions, recursive)
+                }
+                (None, None) => update_watch_interactive(state),
+                _ => Err(anyhow::anyhow!(
+                    "non-interactive usage requires --key and at least one --action"
+                )),
+            };
             if result.is_ok() {
                 reload_auditrs()?;
             }
             result
         }
-        Some(("remove", _sub_m)) => {
-            let result = remove_watch_interactive(state);
+        Some(("remove", sub_m)) => {
+            let key = sub_m
+                .get_one::<String>("key")
+                .cloned()
+                .or_else(|| sub_m.get_one::<String>("value").cloned());
+            let result = match key {
+                Some(k) => remove_watch_by_key(state, &k),
+                None => remove_watch_interactive(state),
+            };
             if result.is_ok() {
                 reload_auditrs()?;
             }

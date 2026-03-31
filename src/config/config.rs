@@ -179,16 +179,25 @@ impl AuditConfig {
                     toml::Value::Integer(primary_size as i64),
                 );
             }
-            SetConfigVariables::LogFormat {} => {
+            SetConfigVariables::LogFormat { value } => {
                 let current_fmt = capitalize_first_letter(&config.log_format.to_string());
-                let log_format = Select::new("Select a log format", LOG_FORMATS.to_vec())
-                    .with_help_message(&format!(
-                        "Current log format: {}]\n[{}",
-                        current_fmt,
-                        Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()
-                    ))
-                    .prompt()?
-                    .to_lowercase();
+                let log_format = match value {
+                    Some(v) => v.to_lowercase(),
+                    None => Select::new("Select a log format", LOG_FORMATS.to_vec())
+                        .with_help_message(&format!(
+                            "Current log format: {}]\n[{}",
+                            current_fmt,
+                            Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()
+                        ))
+                        .prompt()?
+                        .to_lowercase(),
+                };
+
+                // Validate format with the same parser used elsewhere.
+                let _parsed = log_format
+                    .parse::<LogFormat>()
+                    .map_err(|e| anyhow!(e))
+                    .context("invalid log format")?;
 
                 settings.insert(
                     "log_format".into(),

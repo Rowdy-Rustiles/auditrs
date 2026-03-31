@@ -241,7 +241,17 @@ fn build_config() -> ClapCommand {
         .subcommand(
             ClapCommand::new("set")
                 .about("Update config values, will reboot the daemon if the config was changed")
-                .subcommand(ClapCommand::new("format").about("Set the output format"))
+                .subcommand(
+                    ClapCommand::new("format")
+                        .about("Set the output format")
+                        .arg(
+                            Arg::new("value")
+                                .value_name("FORMAT")
+                                .required(false)
+                                .value_parser(["legacy", "simple", "json"])
+                                .help("New log format; omit for interactive selection"),
+                        ),
+                )
                 .subcommand(
                     ClapCommand::new("log-directory")
                         .about("Set the log directory")
@@ -291,9 +301,27 @@ fn build_filter() -> ClapCommand {
         .subcommand(
             ClapCommand::new("get").about("Show current filters"),
         )
-        .subcommand(ClapCommand::new("add")
-        .about("Add a filter rule")
-        .long_about("Add a filter rule for a record type defined in:\nhttps://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md"))
+        .subcommand(
+            ClapCommand::new("add")
+                .about("Add a filter rule")
+                .long_about(
+                    "Add a filter rule for a record type defined in:\nhttps://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md",
+                )
+                .arg(
+                    Arg::new("record_type")
+                        .long("record-type")
+                        .value_name("RECORD_TYPE")
+                        .required(false)
+                        .help("Record type to add; omit for interactive prompt"),
+                )
+                .arg(
+                    Arg::new("action")
+                        .long("action")
+                        .value_name("ACTION")
+                        .required(false)
+                        .help("Filter action (allow, block, sample, redact, route_secondary, tag, count_only, alert)"),
+                ),
+        )
         .subcommand(
             ClapCommand::new("remove")
                 .about("Remove a filter rule")
@@ -301,9 +329,25 @@ fn build_filter() -> ClapCommand {
                     "Record type to remove; omit for interactive choice from existing filters",
                 )),
         )
-        .subcommand(ClapCommand::new("update")
-        .about("Update a filter rule")
-        .long_about("Update an existing filter rule"))
+        .subcommand(
+            ClapCommand::new("update")
+                .about("Update a filter rule")
+                .long_about("Update an existing filter rule")
+                .arg(
+                    Arg::new("record_type")
+                        .long("record-type")
+                        .value_name("RECORD_TYPE")
+                        .required(false)
+                        .help("Record type to update; omit for interactive prompt"),
+                )
+                .arg(
+                    Arg::new("action")
+                        .long("action")
+                        .value_name("ACTION")
+                        .required(false)
+                        .help("New filter action; omit for interactive prompt"),
+                ),
+        )
         .subcommand(
             ClapCommand::new("import")
                 .about("Import filters from a file (supports .ars, .toml)")
@@ -332,19 +376,73 @@ fn build_watch() -> ClapCommand {
         .subcommand(
             ClapCommand::new("get").about("Show current watches"),
         )
-        .subcommand(ClapCommand::new("add")
-        .about("Add a watch rule")
-        .long_about("Add a watch rule for as specified in:\nTO IMPLEMENT"))
+        .subcommand(
+            ClapCommand::new("add")
+                .about("Add a watch rule")
+                .long_about("Add a watch rule for as specified in:\nTO IMPLEMENT")
+                .arg(
+                    Arg::new("path")
+                        .value_name("PATH")
+                        .required(false)
+                        .help("Path to watch; omit for interactive prompt"),
+                )
+                .arg(
+                    Arg::new("action")
+                        .long("action")
+                        .value_name("ACTION")
+                        .required(false)
+                        .action(ArgAction::Append)
+                        .help("Watch action (read, write, execute). Repeatable. Omit for interactive prompt"),
+                )
+                .arg(
+                    Arg::new("recursive")
+                        .long("recursive")
+                        .action(ArgAction::SetTrue)
+                        .help("Watch directories recursively (non-interactive only)"),
+                ),
+        )
         .subcommand(
             ClapCommand::new("remove")
                 .about("Remove a watch rule")
+                .arg(
+                    Arg::new("key")
+                        .long("key")
+                        .value_name("KEY")
+                        .required(false)
+                        .help("Key of the watch to remove; omit for interactive prompt"),
+                )
                 .arg(Arg::new("value").value_name("VALUE").required(false).help(
-                    "Path to remove; omit for interactive choice from existing watches",
+                    "Key to remove; omit for interactive choice from existing watches",
                 )),
         )
-         .subcommand(ClapCommand::new("update")
-        .about("Update a watch rule")
-        .long_about("Update an existing watch rule"))
+        .subcommand(
+            ClapCommand::new("update")
+                .about("Update a watch rule")
+                .long_about("Update an existing watch rule")
+                .arg(
+                    Arg::new("key")
+                        .long("key")
+                        .value_name("KEY")
+                        .required(false)
+                        .help("Key of the watch to update; omit for interactive prompt"),
+                )
+                .arg(
+                    Arg::new("action")
+                        .long("action")
+                        .value_name("ACTION")
+                        .required(false)
+                        .action(ArgAction::Append)
+                        .help("New watch actions (read, write, execute). Repeatable. Omit for interactive prompt"),
+                )
+                .arg(
+                    Arg::new("recursive")
+                        .long("recursive")
+                        .value_name("true|false")
+                        .required(false)
+                        .value_parser(["true", "false"])
+                        .help("Set recursive mode (non-interactive only)"),
+                ),
+        )
         .subcommand(
             ClapCommand::new("import")
                 .about("Import watches from a file (supports .ars, .toml)")
