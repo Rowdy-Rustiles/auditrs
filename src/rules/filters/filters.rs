@@ -267,8 +267,8 @@ pub fn add_filter(record_type: &str, action: &str) -> Result<()> {
         return Err(anyhow!("record type cannot be empty"));
     }
 
-    let is_valid_record_type = RecordType::iter()
-        .any(|rt| rt.as_audit_str().eq_ignore_ascii_case(record_type));
+    let is_valid_record_type =
+        RecordType::iter().any(|rt| rt.as_audit_str().eq_ignore_ascii_case(record_type));
     if !is_valid_record_type {
         return Err(anyhow!(
             "invalid record type '{}'; use a known record type",
@@ -283,7 +283,10 @@ pub fn add_filter(record_type: &str, action: &str) -> Result<()> {
     }
     let action = FilterAction::from_str(&action.to_lowercase())?;
 
-    set_filter(AuditFilter { record_type, action })
+    set_filter(AuditFilter {
+        record_type,
+        action,
+    })
 }
 
 /// Update an existing filter non-interactively.
@@ -297,12 +300,11 @@ pub fn update_filter(state: &State, record_type: &str, action: &str) -> Result<(
         return Err(anyhow!("record type cannot be empty"));
     }
 
-    let exists = state
-        .rules
-        .filters
-        .as_slice()
-        .iter()
-        .any(|f| f.record_type.as_audit_str().eq_ignore_ascii_case(record_type_trimmed));
+    let exists = state.rules.filters.as_slice().iter().any(|f| {
+        f.record_type
+            .as_audit_str()
+            .eq_ignore_ascii_case(record_type_trimmed)
+    });
     if !exists {
         return Err(anyhow!(
             "no existing filter for record type '{}'; use 'filter add' instead",
@@ -323,12 +325,11 @@ pub fn remove_filter_by_record_type(state: &State, record_type: &str) -> Result<
         return Err(anyhow!("record type cannot be empty"));
     }
 
-    let exists = state
-        .rules
-        .filters
-        .as_slice()
-        .iter()
-        .any(|f| f.record_type.as_audit_str().eq_ignore_ascii_case(record_type_trimmed));
+    let exists = state.rules.filters.as_slice().iter().any(|f| {
+        f.record_type
+            .as_audit_str()
+            .eq_ignore_ascii_case(record_type_trimmed)
+    });
     if !exists {
         return Err(anyhow!(
             "no existing filter for record type '{}'",

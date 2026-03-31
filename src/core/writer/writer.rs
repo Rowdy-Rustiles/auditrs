@@ -314,7 +314,12 @@ impl AuditLogWriter {
             new_path
         };
 
-        let mut file_handle = OpenOptions::new().create(true).append(true).open(&path)?;
+        let mut file_handle = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .append(true)
+            .open(&path)?;
         // A little messy but ok for now
         if self.log_format == LogFormat::Json {
             Self::append_json_array_element(&mut file_handle, &line, "primary")?;

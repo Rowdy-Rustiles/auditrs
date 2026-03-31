@@ -31,12 +31,12 @@ use crate::rules::{
     import_filters,
     import_watches,
     remove_filter_by_record_type,
-    remove_watch_by_key,
     remove_filter_interactive,
+    remove_watch_by_key,
     remove_watch_interactive,
     update_filter,
-    update_watch_by_key,
     update_filter_interactive,
+    update_watch_by_key,
     update_watch_interactive,
 };
 use crate::state::State;
@@ -191,9 +191,11 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
             let result = match (record_type, action) {
                 (Some(rt), Some(a)) => add_filter(&rt, &a),
                 (None, None) => add_filter_interactive(state),
-                _ => Err(anyhow::anyhow!(
-                    "non-interactive usage requires both --record-type and --action"
-                )),
+                _ => {
+                    Err(anyhow::anyhow!(
+                        "non-interactive usage requires both --record-type and --action"
+                    ))
+                }
             };
             if result.is_ok() {
                 reload_auditrs()?;
@@ -207,9 +209,11 @@ fn handle_filter(matches: &ArgMatches, state: &State) -> Result<()> {
             let result = match (record_type, action) {
                 (Some(rt), Some(a)) => update_filter(state, &rt, &a),
                 (None, None) => update_filter_interactive(state),
-                _ => Err(anyhow::anyhow!(
-                    "non-interactive usage requires both --record-type and --action"
-                )),
+                _ => {
+                    Err(anyhow::anyhow!(
+                        "non-interactive usage requires both --record-type and --action"
+                    ))
+                }
             };
             if result.is_ok() {
                 reload_auditrs()?;
@@ -259,24 +263,28 @@ fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
         Some(("get", _sub_m)) => get_watches(state),
         Some(("add", sub_m)) => {
             let path = sub_m.get_one::<String>("path").cloned();
-            let actions = sub_m.get_many::<String>("action").map(|vals| {
-                vals.map(|s| s.to_string()).collect::<Vec<String>>()
-            });
+            let actions = sub_m
+                .get_many::<String>("action")
+                .map(|vals| vals.map(|s| s.to_string()).collect::<Vec<String>>());
             let recursive = sub_m.get_one::<bool>("recursive").copied().unwrap_or(false);
 
             let result = match (path, actions) {
                 (Some(p), Some(a)) => {
                     let actions = a
                         .iter()
-                        .map(|s| crate::rules::WatchAction::from_str(&s.to_lowercase())
-                            .map_err(anyhow::Error::from))
+                        .map(|s| {
+                            crate::rules::WatchAction::from_str(&s.to_lowercase())
+                                .map_err(anyhow::Error::from)
+                        })
                         .collect::<Result<Vec<_>>>()?;
                     add_watch(&p, actions, recursive)
                 }
                 (None, None) => add_watch_interactive(),
-                _ => Err(anyhow::anyhow!(
-                    "non-interactive usage requires PATH and at least one --action"
-                )),
+                _ => {
+                    Err(anyhow::anyhow!(
+                        "non-interactive usage requires PATH and at least one --action"
+                    ))
+                }
             };
             if result.is_ok() {
                 reload_auditrs()?;
@@ -285,9 +293,9 @@ fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
         }
         Some(("update", sub_m)) => {
             let key = sub_m.get_one::<String>("key").cloned();
-            let actions = sub_m.get_many::<String>("action").map(|vals| {
-                vals.map(|s| s.to_string()).collect::<Vec<String>>()
-            });
+            let actions = sub_m
+                .get_many::<String>("action")
+                .map(|vals| vals.map(|s| s.to_string()).collect::<Vec<String>>());
             let recursive = sub_m
                 .get_one::<String>("recursive")
                 .map(|s| s.eq_ignore_ascii_case("true"));
@@ -296,15 +304,19 @@ fn handle_watch(matches: &ArgMatches, state: &State) -> Result<()> {
                 (Some(k), Some(a)) => {
                     let actions = a
                         .iter()
-                        .map(|s| crate::rules::WatchAction::from_str(&s.to_lowercase())
-                            .map_err(anyhow::Error::from))
+                        .map(|s| {
+                            crate::rules::WatchAction::from_str(&s.to_lowercase())
+                                .map_err(anyhow::Error::from)
+                        })
                         .collect::<Result<Vec<_>>>()?;
                     update_watch_by_key(state, &k, actions, recursive)
                 }
                 (None, None) => update_watch_interactive(state),
-                _ => Err(anyhow::anyhow!(
-                    "non-interactive usage requires --key and at least one --action"
-                )),
+                _ => {
+                    Err(anyhow::anyhow!(
+                        "non-interactive usage requires --key and at least one --action"
+                    ))
+                }
             };
             if result.is_ok() {
                 reload_auditrs()?;

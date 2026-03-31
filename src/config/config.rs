@@ -183,14 +183,16 @@ impl AuditConfig {
                 let current_fmt = capitalize_first_letter(&config.log_format.to_string());
                 let log_format = match value {
                     Some(v) => v.to_lowercase(),
-                    None => Select::new("Select a log format", LOG_FORMATS.to_vec())
-                        .with_help_message(&format!(
-                            "Current log format: {}]\n[{}",
-                            current_fmt,
-                            Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()
-                        ))
-                        .prompt()?
-                        .to_lowercase(),
+                    None => {
+                        Select::new("Select a log format", LOG_FORMATS.to_vec())
+                            .with_help_message(&format!(
+                                "Current log format: {}]\n[{}",
+                                current_fmt,
+                                Select::<&str>::DEFAULT_HELP_MESSAGE.unwrap()
+                            ))
+                            .prompt()?
+                            .to_lowercase()
+                    }
                 };
 
                 // Validate format with the same parser used elsewhere.
