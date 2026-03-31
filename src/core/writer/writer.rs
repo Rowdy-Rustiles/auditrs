@@ -30,6 +30,49 @@ use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtim
 // TODO: this whole module needs to be closely looked over, a lot of IO is
 // happening here and we want to make sure its not wasting resources.
 impl AuditLogWriter {
+    /// Append a JSON element into a file that is maintained as a single
+    /// top-level JSON array.
+    ///
+    /// The file is kept in a state that always ends with the trailer `\n]\n`.
+    /// On each append we:
+    /// - create `[\n]\n` structure if empty
+    /// - otherwise verify and temporarily remove the trailer
+    /// - insert `,\n` if the array already has at least one element
+    /// - write the element and re-add the trailer
+    fn append_json_array_element(
+        file: &mut std::fs::File,
+        element_pretty: &str,
+        location: &str,
+    ) -> Result<()> {
+        let len = file.metadata()?.len();
+
+        if len == 0 {
+            writeln!(file, "[")?;
+        } else if len > 2 {
+            let mut tail3 = [0u8; 3];
+            file.read_at(&mut tail3, len - 3)?;
+            if tail3 != *b"\n]\n" {
+                return Err(anyhow::anyhow!(
+                    "{}: Unexpected JSON log trailer: expected {:?}, got {:?}",
+                    location,
+                    b"\n]\n",
+                    tail3
+                ));
+            }
+
+            let new_len = len - 3;
+            file.set_len(new_len)?;
+            if new_len > 2 {
+                write!(file, ",\n")?;
+            }
+        }
+
+        write!(file, "{}", element_pretty)?;
+        writeln!(file, "\n]")?;
+        file.flush()?;
+        Ok(())
+    }
+
     /// Constructs a new `AuditLogWriter` using the current application state.
     ///
     /// This function:
@@ -206,32 +249,7 @@ impl AuditLogWriter {
     /// * `write_primary`: When `true`, the JSON representation will also be
     ///   written to the primary log.
     fn write_event_json(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
-        let len = self.active.file_handle.metadata()?.len();
-
-        // We have a new file, we open a new JSON array
-        if len == 0 {
-            writeln!(self.active.file_handle, "[")?;
-        } else if len > 2 {
-            // Completed writes end with `\n]\n` (closing the JSON array of audit events).
-            // We strip the existing closing bracket to make room for the next
-            // event. The closing bracket is added back at the end of the function.
-            let mut tail3 = [0u8; 3];
-            self.active.file_handle.read_at(&mut tail3, len - 3)?;
-            if tail3 != *b"\n]\n" {
-                return Err(anyhow::anyhow!(
-                    "Unexpected JSON log trailer: expected {:?}, got {:?}",
-                    b"\n]\n",
-                    tail3
-                ));
-            }
-
-            let new_len = len - 3;
-            self.active.file_handle.set_len(new_len)?;
-            // Insert a comma between elements (not after `[` when the array is empty).
-            if new_len > 2 {
-                write!(self.active.file_handle, ",\n")?;
-            }
-        }
+        // TODO: We should add an option for condensed JSON to save space.
         // Create JSON object representing event
         let mut event_json = serde_json::json!({
             "timestamp": systemtime_to_utc_string(event.timestamp), // TODO: Is UTC string the right choice?
@@ -265,9 +283,7 @@ impl AuditLogWriter {
             .collect::<Vec<String>>()
             .join("\n");
 
-        write!(self.active.file_handle, "{}", event_str)?;
-        writeln!(self.active.file_handle, "\n]")?;
-        self.active.file_handle.flush()?;
+        Self::append_json_array_element(&mut self.active.file_handle, &event_str, "active")?;
 
         if write_primary {
             self.write_primary(event_str)?;
@@ -299,6 +315,12 @@ impl AuditLogWriter {
         };
 
         let mut file_handle = OpenOptions::new().create(true).append(true).open(&path)?;
+        // A little messy but ok for now
+        if self.log_format == LogFormat::Json {
+            Self::append_json_array_element(&mut file_handle, &line, "primary")?;
+            return Ok(());
+        }
+
         write!(file_handle, "{}", line)?;
         file_handle.flush()?;
         Ok(())
@@ -900,6 +922,29 @@ mod tests {
             contents,
             "type=ADD_GROUP msg=audit(0.000:1): key=auditrs_watch_1234567890\n"
         );
+        cleanup();
+    }
+
+    #[test]
+    #[serial(writer)]
+    fn write_json_to_primary_is_valid_array() {
+        let mut state = get_state();
+        state.config.log_format = LogFormat::Json;
+        // Avoid rotating active while testing primary behavior.
+        state.config.log_size = 1_000_000;
+
+        let mut writer = AuditLogWriter::new(Some(state)).unwrap();
+        let event = create_event_with_watch_key();
+        writer.write_event(event).unwrap();
+
+        let primary_path = writer.primary.paths.last().unwrap();
+        let contents = std::fs::read_to_string(primary_path).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&contents).unwrap();
+        let arr = v.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["serial"].as_u64().unwrap(), 1);
+        assert_eq!(arr[0]["record_count"].as_u64().unwrap(), 1);
+
         cleanup();
     }
 

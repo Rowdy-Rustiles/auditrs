@@ -19,10 +19,12 @@ sudo echo -e "The following events were called to create this file:\n
 \t4. echo "This is some text" > ./tmp/test/test.txt
 \t5. echo "This is some more text" > ./tmp/test/test.txt" > ./tmp/test/test.txt
 
-echo -e "${BOLD}${BLUE}\nPrimary log:${NORMAL}"
-sudo ls /var/log/auditrs/primary/
-
 echo -e "${BOLD}${BLUE}\nWaiting 4 seconds for the primary log to be written...${NORMAL}"
 sleep 4
+
+echo -e "${BOLD}${BLUE}\nPrimary log:${NORMAL}"
+sudo ls /var/log/auditrs/primary/
+echo -e "\n"
+
 
 sudo ls /var/log/auditrs/primary/ | head -n 1 | xargs -I {} sudo cat /var/log/auditrs/primary/{}
