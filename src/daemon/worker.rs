@@ -19,6 +19,7 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
 
+use crate::core::enricher::enrich_event;
 use crate::core::{
     correlator::{AuditEvent, Correlator},
     netlink::{NetlinkAuditTransport, RawAuditRecord},
@@ -65,10 +66,12 @@ pub async fn run_worker() -> Result<()> {
 
     let (parsed_audit_tx, parsed_audit_rx) = mpsc::channel(1000);
     let (correlated_event_tx, correlated_event_rx) = mpsc::channel(1000);
+    let (enriched_event_tx, enriched_event_rx) = mpsc::channel(1000);
 
     let parser_task = spawn_parser_task(raw_audit_rx, parsed_audit_tx);
     let correlator_task = spawn_correlator_task(correlator, parsed_audit_rx, correlated_event_tx);
-    let writer_task = spawn_writer_task(writer, correlated_event_rx, config_rx, rules_rx);
+    let enricher_task = spawn_enricher_task(correlated_event_rx, enriched_event_tx);
+    let writer_task = spawn_writer_task(writer, enriched_event_rx, config_rx, rules_rx);
 
     let mut sigterm = signal(SignalKind::terminate())?;
     let mut sighup = signal(SignalKind::hangup())?;
@@ -176,6 +179,21 @@ fn spawn_correlator_task(
                     }
                 }
             }
+        }
+    })
+}
+
+fn spawn_enricher_task(
+    mut receiver: mpsc::Receiver<AuditEvent>,
+    sender: mpsc::Sender<AuditEvent>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        while let Some(correlated_event) = receiver.recv().await {
+            let enriched_event = enrich_event(correlated_event);
+            sender
+                .send(enriched_event)
+                .await
+                .unwrap_or_else(|e| eprintln!("Failed to send parsed record: {:?}", e));
         }
     })
 }

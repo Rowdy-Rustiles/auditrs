@@ -30,49 +30,6 @@ use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtim
 // TODO: this whole module needs to be closely looked over, a lot of IO is
 // happening here and we want to make sure its not wasting resources.
 impl AuditLogWriter {
-    /// Append a JSON element into a file that is maintained as a single
-    /// top-level JSON array.
-    ///
-    /// The file is kept in a state that always ends with the trailer `\n]\n`.
-    /// On each append we:
-    /// - create `[\n]\n` structure if empty
-    /// - otherwise verify and temporarily remove the trailer
-    /// - insert `,\n` if the array already has at least one element
-    /// - write the element and re-add the trailer
-    fn append_json_array_element(
-        file: &mut std::fs::File,
-        element_pretty: &str,
-        location: &str,
-    ) -> Result<()> {
-        let len = file.metadata()?.len();
-
-        if len == 0 {
-            writeln!(file, "[")?;
-        } else if len > 2 {
-            let mut tail3 = [0u8; 3];
-            file.read_at(&mut tail3, len - 3)?;
-            if tail3 != *b"\n]\n" {
-                return Err(anyhow::anyhow!(
-                    "{}: Unexpected JSON log trailer: expected {:?}, got {:?}",
-                    location,
-                    b"\n]\n",
-                    tail3
-                ));
-            }
-
-            let new_len = len - 3;
-            file.set_len(new_len)?;
-            if new_len > 2 {
-                write!(file, ",\n")?;
-            }
-        }
-
-        write!(file, "{}", element_pretty)?;
-        writeln!(file, "\n]")?;
-        file.flush()?;
-        Ok(())
-    }
-
     /// Constructs a new `AuditLogWriter` using the current application state.
     ///
     /// This function:
@@ -328,6 +285,49 @@ impl AuditLogWriter {
 
         write!(file_handle, "{}", line)?;
         file_handle.flush()?;
+        Ok(())
+    }
+
+    /// Append a JSON element into a file that is maintained as a single
+    /// top-level JSON array.
+    ///
+    /// The file is kept in a state that always ends with the trailer `\n]\n`.
+    /// On each append we:
+    /// - create `[\n]\n` structure if empty
+    /// - otherwise verify and temporarily remove the trailer
+    /// - insert `,\n` if the array already has at least one element
+    /// - write the element and re-add the trailer
+    fn append_json_array_element(
+        file: &mut std::fs::File,
+        element_pretty: &str,
+        location: &str,
+    ) -> Result<()> {
+        let len = file.metadata()?.len();
+
+        if len == 0 {
+            writeln!(file, "[")?;
+        } else if len > 2 {
+            let mut tail3 = [0u8; 3];
+            file.read_at(&mut tail3, len - 3)?;
+            if tail3 != *b"\n]\n" {
+                return Err(anyhow::anyhow!(
+                    "{}: Unexpected JSON log trailer: expected {:?}, got {:?}",
+                    location,
+                    b"\n]\n",
+                    tail3
+                ));
+            }
+
+            let new_len = len - 3;
+            file.set_len(new_len)?;
+            if new_len > 2 {
+                write!(file, ",\n")?;
+            }
+        }
+
+        write!(file, "{}", element_pretty)?;
+        writeln!(file, "\n]")?;
+        file.flush()?;
         Ok(())
     }
 

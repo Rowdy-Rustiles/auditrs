@@ -1,3 +1,3 @@
-//! Defines the enrichment process for augmenting and clarifying audit events.
-//!
-//! Not yet implemented.
+mod enricher;
+
+pub use enricher::enrich_event;
