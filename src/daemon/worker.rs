@@ -95,8 +95,9 @@ pub async fn run_worker() -> Result<()> {
 
     parser_task.abort();
     correlator_task.abort();
+    enricher_task.abort();
     writer_task.abort();
-    let _ = tokio::join!(parser_task, correlator_task, writer_task);
+    let _ = tokio::join!(parser_task, correlator_task, enricher_task, writer_task);
     Ok(())
 }
 

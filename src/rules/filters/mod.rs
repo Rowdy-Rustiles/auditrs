@@ -48,28 +48,32 @@ use crate::core::parser::RecordType;
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum FilterAction {
-    /// Write matching records to the primary log.
+    /// Write matching records to the primary log. This is the default action of
+    /// all audit record types.
     Allow,
     /// Do not write matching records to the primary log.
     Block,
-    /// Write only a sampled subset of matching records to the primary log.
+    /// Write only a sampled subset of matching records to the primary log. TO
+    /// BE IMPLEMENTED
     Sample,
-    /// Write matching records but with sensitive fields redacted.
+    /// Write matching records but with sensitive fields redacted. TO BE
+    /// IMPLEMENTED
     Redact,
     /// Route matching records to a secondary destination instead of (or in
-    /// addition to) the primary log.
+    /// addition to) the primary log. TO BE IMPLEMENTED
     #[serde(rename = "route_secondary")]
     #[strum(serialize = "route_secondary")]
     RouteSecondary,
     /// Write matching records and tag them for downstream processing or
-    /// analysis.
+    /// analysis. TO BE IMPLEMENTED
     Tag,
     /// Do not write individual records; track only aggregate counts/metrics for
-    /// matches.
+    /// matches. TO BE IMPLEMENTED
     #[serde(rename = "count_only")]
     #[strum(serialize = "count_only")]
     CountOnly,
-    /// Write matching records and also trigger an alert or side-effect.
+    /// Write matching records and also trigger an alert or side-effect. TO BE
+    /// IMPLEMENTED
     Alert,
 }
 

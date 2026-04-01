@@ -24,6 +24,7 @@ use crate::core::{
     correlator::AuditEvent,
     writer::{AuditActive, AuditJournal, AuditLogWriter, AuditPrimary},
 };
+use crate::rules::FilterAction;
 use crate::state::{Rules, State};
 use crate::utils::{current_utc_string, systemtime_to_timestamp_string, systemtime_to_utc_string};
 
@@ -115,7 +116,8 @@ impl AuditLogWriter {
     /// **Parameters:**
     ///
     /// * `event`: The `AuditEvent` to be written.
-    pub fn write_event(&mut self, event: AuditEvent) -> Result<()> {
+    pub fn write_event(&mut self, mut event: AuditEvent) -> Result<()> {
+        self.apply_filters(&mut event);
         let write_primary = self.check_watch_events(&event);
         match self.log_format {
             LogFormat::Legacy => self.write_event_legacy(event, write_primary)?,
@@ -329,6 +331,24 @@ impl AuditLogWriter {
         writeln!(file, "\n]")?;
         file.flush()?;
         Ok(())
+    }
+
+    /// Apply filters to the audit event.
+    ///
+    /// Applies the filters configured in the rules to the given audit event.
+    /// Currently, this only blocks explicit records types and does not support
+    /// precedence or wildcards.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` to apply the filters to.
+    fn apply_filters(&mut self, event: &mut AuditEvent) {
+        let filters = &self.state.rules.filters.0;
+        event.records.retain(|record| {
+            !filters.iter().any(|filter| {
+                filter.record_type == record.record_type && filter.action == FilterAction::Block
+            })
+        });
     }
 
     /// Check if the audit event contains a record with a key identifier that
