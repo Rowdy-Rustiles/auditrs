@@ -5,7 +5,7 @@ An example Config.toml file for auditrs. In production, these are stored at /etc
 */
 
 [meta]
-version = "0.3.0"
+version = "v0.6.0-alpha"
 
 [settings]
 log_format = "legacy"

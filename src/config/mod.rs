@@ -36,7 +36,7 @@ pub const FILTER_FILE_EXTENSIONS: &[&str] = &["toml", "ars"];
 pub const LOG_FORMATS: &[&str] = &["Legacy", "Simple", "Json"];
 /// The default configuration for the auditrs daemon.
 pub const DEFAULT_CONFIG: &str = r#"[meta]
-version = "0.3.0"
+version = "0.6.0-alpha"
 
 [settings]
 log_format = "legacy"
