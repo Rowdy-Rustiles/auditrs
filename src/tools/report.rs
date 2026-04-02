@@ -15,11 +15,12 @@ use crate::{
     utils::{read_from_json, read_from_legacy, read_from_simple},
 };
 
-pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
+/// Prints a debug dump of primary-log events for the configured log format.
+pub fn generate_report(state: &State, _matches: &ArgMatches) -> Result<()> {
     let primary_directory = PathBuf::from(&state.config.primary_directory);
     let events = match state.config.log_format {
-        LogFormat::Legacy => read_from_legacy(state),
-        LogFormat::Simple => read_from_simple(state),
+        LogFormat::Legacy => read_from_legacy(&primary_directory),
+        LogFormat::Simple => read_from_simple(&primary_directory),
         LogFormat::Json => read_from_json(&primary_directory),
     };
 
