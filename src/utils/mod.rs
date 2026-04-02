@@ -15,5 +15,10 @@ mod input_utils;
 mod reading_utils;
 mod utils;
 
+// We expose serde_systemtime as a public standalone module for attribution in
+// SystemTime serialization.
+pub mod serde_systemtime;
+
 pub use input_utils::*;
+pub use reading_utils::*;
 pub use utils::*;

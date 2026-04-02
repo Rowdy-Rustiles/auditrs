@@ -3,6 +3,11 @@ BLUE=$(tput setaf 4)
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root" 
+   exit 1
+fi
+
 echo -e "${BOLD}${BLUE}===========TRIGGERING AUDIT EVENTS===========${NORMAL}"
 echo -e "${BOLD}${BLUE}Running ls, mkdir, and touch in ./tmp${NORMAL}"
 

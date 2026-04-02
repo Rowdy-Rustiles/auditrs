@@ -4,5 +4,6 @@ output/
 ec2/
 tmp/
 .vscode/
+out/
 workspace.code-workspace
 *.pem

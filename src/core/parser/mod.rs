@@ -12,6 +12,8 @@
 pub mod audit_types;
 pub mod parser;
 
+use serde::{Deserialize, Serialize};
+
 pub use audit_types::RecordType;
 
 /// Intermediate result of parsing an audit message; used by parser and
@@ -27,11 +29,12 @@ pub struct RecordData {
 }
 
 /// A parsed audit record.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParsedAuditRecord {
     /// The type of the record.
     pub(crate) record_type: RecordType,
     /// The timestamp of the record.
+    #[serde(with = "crate::utils::serde_systemtime")]
     pub(crate) timestamp: std::time::SystemTime,
     /// The serial number of the record.
     pub(crate) serial: u16,

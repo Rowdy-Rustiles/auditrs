@@ -11,13 +11,16 @@ mod event;
 use std::collections::HashMap;
 use std::time::{Instant, SystemTime};
 
+use serde::{Deserialize, Serialize};
+
 use crate::core::parser::ParsedAuditRecord;
 
 /// A single audit event: one or more records sharing the same (timestamp,
 /// serial).
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AuditEvent {
     /// Event timestamp from the audit stream.
+    #[serde(with = "crate::utils::serde_systemtime")]
     pub timestamp: SystemTime,
     /// Serial number identifying this event in the stream.
     pub serial: u16,

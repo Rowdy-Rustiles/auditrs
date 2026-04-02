@@ -40,6 +40,7 @@ use crate::rules::{
     update_watch_interactive,
 };
 use crate::state::State;
+use crate::tools::report::generate_report;
 
 /// Top-level entry point for handling CLI subcommands
 ///
@@ -55,7 +56,7 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
         Some(("status", _)) => status_auditrs()?,
         Some(("dump", sub_m)) => handle_dump(sub_m)?,
         Some(("search", sub_m)) => handle_search(sub_m)?,
-        Some(("report", sub_m)) => handle_report(sub_m)?,
+        Some(("report", sub_m)) => handle_report(sub_m, &state)?,
         Some(("config", sub_m)) => handle_config(sub_m)?,
         Some(("filter", sub_m)) => handle_filter(sub_m, &state)?,
         Some(("watch", sub_m)) => handle_watch(sub_m, &state)?,
@@ -95,8 +96,8 @@ fn handle_search(_matches: &ArgMatches) -> Result<()> {
 ///
 /// * `matches`: CLI argument to match a handling function. Subcommands and
 ///   flags of the argument can be used for further options
-fn handle_report(_matches: &ArgMatches) -> Result<()> {
-    todo!()
+fn handle_report(matches: &ArgMatches, state: &State) -> Result<()> {
+    generate_report(&state, matches)
 }
 
 /// Dispatch of config handling commands. Config getters are directly addressed
