@@ -12,6 +12,9 @@ pub fn read_from_json(primary_directory: &PathBuf) -> Vec<AuditEvent> {
     let mut events = Vec::new();
     for file in files {
         let file = file.unwrap();
+        if file.path().extension().unwrap_or_default() != "json" {
+            continue;
+        }
         let content = fs::read_to_string(file.path()).unwrap();
         let event: Vec<AuditEvent> = serde_json::from_str(&content)
             .map_err(|e| anyhow::anyhow!("Failed to parse JSON: {}", e))
