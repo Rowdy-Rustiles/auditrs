@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::Context;
 use strum::IntoEnumIterator;
 
-use crate::core::correlator::{AuditEvent};
+use crate::core::correlator::AuditEvent;
 use crate::core::netlink::RawAuditRecord;
 use crate::core::parser::{ParsedAuditRecord, RecordType};
 

@@ -28,13 +28,13 @@ use crate::utils::capitalize_first_letter;
 ///
 /// * `s`: The string to match to a `LogFormat` variant (case-insensitive).
 impl std::str::FromStr for LogFormat {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         match s.to_lowercase().as_str() {
             "legacy" => Ok(LogFormat::Legacy),
             "simple" => Ok(LogFormat::Simple),
             "json" => Ok(LogFormat::Json),
-            _ => Err(format!("Unknown format: {}", s)),
+            _ => Err(anyhow!("Unknown format: {}", s)),
         }
     }
 }

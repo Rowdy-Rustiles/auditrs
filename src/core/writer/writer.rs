@@ -14,10 +14,10 @@
 
 use anyhow::Result;
 use serde_json;
-use std::fs::{OpenOptions, create_dir_all};
+use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::Write;
 use std::os::unix::fs::FileExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::{AuditConfig, LogFormat};
 use crate::core::{
@@ -142,22 +142,8 @@ impl AuditLogWriter {
     /// * `event`: The correlated `AuditEvent` to render.
     /// * `write_primary`: When `true`, the same formatted line is also written
     ///   to the primary log in addition to the active log.
-    fn write_event_legacy(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
-        let mut event_str: String = String::new();
-        for record in event.records {
-            let mut prefix: String = String::new();
-            let mut fields: String = String::new();
-            prefix.push_str(&format!(
-                "type={} msg=audit({}:{}):",
-                record.record_type.as_audit_str(),
-                systemtime_to_timestamp_string(event.timestamp)?,
-                event.serial
-            ));
-            for field in record.fields {
-                fields.push_str(&format!(" {}={}", field.0, field.1));
-            }
-            event_str.push_str(&format!("{}{}\n", prefix, fields));
-        }
+    pub fn write_event_legacy(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
+        let event_str = Self::format_legacy_event(&event)?;
 
         write!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
@@ -187,7 +173,8 @@ impl AuditLogWriter {
     /// * `write_primary`: When `true`, also mirrors the simple-formatted event
     ///   into the primary log.
     fn write_event_simple(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
-        let event_str = format!("{}\n", event);
+        let event_str = Self::format_simple_event(&event);
+
         write!(self.active.file_handle, "{}", event_str)?;
         self.active.file_handle.flush()?;
 
@@ -209,38 +196,7 @@ impl AuditLogWriter {
     ///   written to the primary log.
     fn write_event_json(&mut self, event: AuditEvent, write_primary: bool) -> Result<()> {
         // TODO: We should add an option for condensed JSON to save space.
-        // Create JSON object representing event
-        let mut event_json = serde_json::json!({
-            "timestamp": systemtime_to_utc_string(event.timestamp), // TODO: Is UTC string the right choice?
-            "serial": event.serial,
-            "record_count": event.record_count,
-            "records": []
-        });
-
-        // Add each record as entry in records array
-        let records_array = event_json["records"].as_array_mut().unwrap(); // unwrap is ok because we just defined records above
-        for record in &event.records {
-            let record_json = serde_json::json!({
-                "record_type": record.record_type.as_audit_str(),
-                "timestamp": systemtime_to_utc_string(event.timestamp),
-                "serial": record.serial, // TODO: take this out, redundant?
-                "fields": record.fields,
-            });
-
-            // The "cmd" field gets encoded into hex, we should decode for readability.
-            // if let Some(cmd) = record.fields.get("cmd") {
-            //     if let Some(decoded) = decode_hex_command(cmd)
-            //          record_json["decoded_command"] = serde_json::json!(decoded);
-            // }
-            records_array.push(record_json);
-        }
-        // Convert our structured JSON object into a string, write to disk. Tab are
-        // added for more accurate JSON pretty print formatting.
-        let event_str = serde_json::to_string_pretty(&event_json)?
-            .lines()
-            .map(|line| "\t".to_string() + line)
-            .collect::<Vec<String>>()
-            .join("\n");
+        let event_str = Self::format_json_event_pretty(&event)?;
 
         Self::append_json_array_element(&mut self.active.file_handle, &event_str, "active")?;
 
@@ -290,6 +246,79 @@ impl AuditLogWriter {
         Ok(())
     }
 
+    /// Formats a single [`AuditEvent`] as a legacy audit log string (including
+    /// trailing newlines per record).
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` to format.
+    fn format_legacy_event(event: &AuditEvent) -> Result<String> {
+        let mut event_str = String::new();
+        for record in &event.records {
+            let mut prefix = String::new();
+            let mut fields = String::new();
+            prefix.push_str(&format!(
+                "type={} msg=audit({}:{}):",
+                record.record_type.as_audit_str(),
+                systemtime_to_timestamp_string(event.timestamp)?,
+                event.serial
+            ));
+            for field in &record.fields {
+                fields.push_str(&format!(" {}={}", field.0, field.1));
+            }
+            event_str.push_str(&format!("{}{}\n", prefix, fields));
+        }
+        Ok(event_str)
+    }
+
+    /// Formats a single [`AuditEvent`] in the simple (human-readable) format.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` to format.
+    fn format_simple_event(event: &AuditEvent) -> String {
+        format!("{}\n", event)
+    }
+
+    /// Pretty-printed JSON for one [`AuditEvent`] (tab-indented lines), for use
+    /// with JSON array append logic in this module.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `event`: The `AuditEvent` to format.
+    fn format_json_event_pretty(event: &AuditEvent) -> Result<String> {
+        let mut event_json = serde_json::json!({
+            "timestamp": systemtime_to_utc_string(event.timestamp), // TODO: Is UTC string the right choice?
+            "serial": event.serial,
+            "record_count": event.record_count,
+            "records": []
+        });
+
+        let records_array = event_json["records"].as_array_mut().unwrap(); // unwrap is ok because we just defined records above
+        for record in &event.records {
+            let record_json = serde_json::json!({
+                "record_type": record.record_type.as_audit_str(),
+                "timestamp": systemtime_to_utc_string(event.timestamp),
+                "serial": record.serial, // TODO: take this out, redundant?
+                "fields": record.fields,
+            });
+
+            // The "cmd" field gets encoded into hex, we should decode for readability.
+            // if let Some(cmd) = record.fields.get("cmd") {
+            //     if let Some(decoded) = decode_hex_command(cmd)
+            //          record_json["decoded_command"] = serde_json::json!(decoded);
+            // }
+            records_array.push(record_json);
+        }
+        // Tab are added for more accurate JSON pretty print formatting.
+        let event_str = serde_json::to_string_pretty(&event_json)?
+            .lines()
+            .map(|line| "\t".to_string() + line)
+            .collect::<Vec<String>>()
+            .join("\n");
+        Ok(event_str)
+    }
+
     /// Append a JSON element into a file that is maintained as a single
     /// top-level JSON array.
     ///
@@ -330,6 +359,65 @@ impl AuditLogWriter {
         write!(file, "{}", element_pretty)?;
         writeln!(file, "\n]")?;
         file.flush()?;
+        Ok(())
+    }
+
+    /// Writes `events` to `path` in legacy format (overwrites if the file
+    /// exists).
+    ///
+    /// **Parameters:**
+    ///
+    /// * `path`: The path to the file to write the events to.
+    /// * `events`: The `AuditEvent`s to write.
+    pub fn write_events_legacy(path: impl AsRef<Path>, events: &[AuditEvent]) -> Result<()> {
+        let mut file = File::create(path.as_ref())?;
+        for event in events {
+            write!(file, "{}", Self::format_legacy_event(event)?)?;
+        }
+        file.flush()?;
+        Ok(())
+    }
+
+    /// Writes `events` to `path` in simple format (overwrites if the file
+    /// exists).
+    ///
+    /// **Parameters:**
+    ///
+    /// * `path`: The path to the file to write the events to.
+    /// * `events`: The `AuditEvent`s to write.
+    pub fn write_events_simple(path: impl AsRef<Path>, events: &[AuditEvent]) -> Result<()> {
+        let mut file = File::create(path.as_ref())?;
+        for event in events {
+            write!(file, "{}", Self::format_simple_event(event))?;
+        }
+        file.flush()?;
+        Ok(())
+    }
+
+    /// Writes `events` to `path` as a single top-level JSON array (overwrites
+    /// if the file exists). Uses the same incremental array layout as
+    /// active logs.
+    ///
+    /// **Parameters:**
+    ///
+    /// * `path`: The path to the file to write the events to.
+    /// * `events`: The `AuditEvent`s to write.
+    pub fn write_events_json(path: impl AsRef<Path>, events: &[AuditEvent]) -> Result<()> {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(true)
+            .open(path.as_ref())?;
+        if events.is_empty() {
+            write!(file, "[]\n")?;
+            file.flush()?;
+            return Ok(());
+        }
+        for event in events {
+            let event_str = Self::format_json_event_pretty(event)?;
+            Self::append_json_array_element(&mut file, &event_str, "report")?;
+        }
         Ok(())
     }
 

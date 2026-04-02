@@ -202,8 +202,15 @@ fn build_report() -> ClapCommand {
             Arg::new("format")
                 .long("format")
                 .value_name("FORMAT")
-                .value_parser(["table", "json"])
+                .value_parser(["legacy", "simple", "json"])
                 .help("Report output format"),
+        )
+        .arg(
+            Arg::new("output_path")
+                .short('o')
+                .long("output")
+                .value_name("PATH")
+                .help("Path to write the report to"),
         )
 }
 
