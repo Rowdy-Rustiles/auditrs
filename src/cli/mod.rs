@@ -63,7 +63,11 @@
 //! - `--by user|result|syscall|exe|type` — aggregation dimension.
 //! - `--failed` — only include failed events.
 //! - `--top N` — show only the top *N* buckets per aggregation.
-//! - `--format table|json` — report output format.
+//! - `--format legacy|simple|json` — report output format.
+//! - `--no-print` — print to stdout instead of saving; `--summary`
+//!   combine/separate prints the summary first.
+//! - With no `-o`/`--output` and without `--no-print`, writes
+//!   `./reports/report_<timestamp>.<ext>`.
 //!
 //! ## `config` — read and update settings
 //!

@@ -11,7 +11,8 @@ pub mod dump;
 pub mod report;
 pub mod search;
 
-/// How summary text should be emitted relative to the main report file.
+/// How summary text should be emitted relative to the main report file or
+/// stdout.
 enum SummaryDisposition {
     Exclude,
     Combine(String),

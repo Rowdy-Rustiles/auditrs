@@ -229,6 +229,12 @@ Examples:
                 .help("Report output format"),
         )
         .arg(
+            Arg::new("no_save")
+                .long("no-save")
+                .action(ArgAction::SetTrue)
+                .help("Do not save the report; print it to stdout (summary at top for combine/separate)"),
+        )
+        .arg(
             Arg::new("output_path")
                 .short('o')
                 .long("output")

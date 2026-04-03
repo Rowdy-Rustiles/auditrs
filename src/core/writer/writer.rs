@@ -17,7 +17,7 @@ use serde_json;
 use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::FileExt;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 use crate::config::{AuditConfig, LogFormat};
 use crate::core::{
@@ -370,11 +370,11 @@ impl AuditLogWriter {
     ///
     /// * `path`: The path to the file to write the events to.
     /// * `events`: The `AuditEvent`s to write.
-    pub fn write_events_legacy(file: &mut File, events: &[AuditEvent]) -> Result<()> {
+    pub fn write_events_legacy<W: Write>(w: &mut W, events: &[AuditEvent]) -> Result<()> {
         for event in events {
-            write!(file, "{}", Self::format_legacy_event(event)?)?;
+            write!(w, "{}", Self::format_legacy_event(event)?)?;
         }
-        file.flush()?;
+        w.flush()?;
         Ok(())
     }
 
@@ -384,11 +384,11 @@ impl AuditLogWriter {
     ///
     /// * `path`: The path to the file to write the events to.
     /// * `events`: The `AuditEvent`s to write.
-    pub fn write_events_simple(file: &mut File, events: &[AuditEvent]) -> Result<()> {
+    pub fn write_events_simple<W: Write>(w: &mut W, events: &[AuditEvent]) -> Result<()> {
         for event in events {
-            write!(file, "{}", Self::format_simple_event(event))?;
+            write!(w, "{}", Self::format_simple_event(event))?;
         }
-        file.flush()?;
+        w.flush()?;
         Ok(())
     }
 

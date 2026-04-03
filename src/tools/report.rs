@@ -7,7 +7,7 @@
 use std::{
     collections::HashMap,
     fs::{OpenOptions, create_dir_all},
-    io::Write,
+    io::{self, Write},
     path::PathBuf,
     str::FromStr,
     time::SystemTime,
@@ -17,13 +17,18 @@ use anyhow::Result;
 use clap::ArgMatches;
 
 use crate::{
-    config::LogFormat, core::{correlator::AuditEvent, writer::AuditLogWriter}, state::State, tools::SummaryDisposition, utils::{
+    config::LogFormat,
+    core::{correlator::AuditEvent, writer::AuditLogWriter},
+    state::State,
+    tools::SummaryDisposition,
+    utils::{
+        current_utc_string,
         parse_rfc3339_timestamp,
         read_from_json,
         read_from_legacy,
         read_from_simple,
         systemtime_to_utc_string,
-    }
+    },
 };
 
 /// Prints a debug dump of primary-log events for the configured log format.
@@ -50,12 +55,31 @@ pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
         state.config.log_format
     };
 
-    if let Some(output_path) = matches.get_one::<String>("output_path") {
-        output_report(&events, PathBuf::from(output_path), output_format, summary)?;
+    let no_save = matches.get_flag("no_save");
+
+    if no_save {
+        print_report(&events, output_format, &summary)?;
+    } else if let Some(output_path) = matches.get_one::<String>("output_path") {
+        output_report(&events, PathBuf::from(output_path), output_format, &summary)?;
+    } else {
+        output_report(
+            &events,
+            default_report_path(output_format),
+            output_format,
+            &summary,
+        )?;
     }
 
-    println!("{:?}", events);
     Ok(())
+}
+
+fn default_report_path(format: LogFormat) -> PathBuf {
+    let ts = current_utc_string().replace(':', "-");
+    PathBuf::from(format!(
+        "./reports/report_{}.{}",
+        ts,
+        format.get_extension()
+    ))
 }
 
 fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Result<Vec<AuditEvent>> {
@@ -139,11 +163,39 @@ fn build_summary_disposition(matches: &ArgMatches, events: &[AuditEvent]) -> Sum
     }
 }
 
+fn write_report_body<W: Write>(w: &mut W, events: &[AuditEvent], format: LogFormat) -> Result<()> {
+    match format {
+        LogFormat::Legacy => AuditLogWriter::write_events_legacy(w, events)?,
+        LogFormat::Simple => AuditLogWriter::write_events_simple(w, events)?,
+        LogFormat::Json => {
+            let body = serde_json::to_string_pretty(events)?;
+            write!(w, "{body}\n")?;
+        }
+    }
+    Ok(())
+}
+
+fn print_report(
+    events: &[AuditEvent],
+    format: LogFormat,
+    summary: &SummaryDisposition,
+) -> Result<()> {
+    let mut out = io::stdout().lock();
+    match summary {
+        SummaryDisposition::Exclude => {}
+        SummaryDisposition::Combine(text) | SummaryDisposition::Separate(text) => {
+            write!(out, "{text}\n")?;
+        }
+    }
+    write_report_body(&mut out, events, format)?;
+    Ok(())
+}
+
 fn output_report(
     events: &[AuditEvent],
     mut output_path: PathBuf,
     format: LogFormat,
-    summary: SummaryDisposition,
+    summary: &SummaryDisposition,
 ) -> Result<()> {
     if let Some(parent) = output_path.parent() {
         if !parent.exists() {
@@ -153,7 +205,7 @@ fn output_report(
 
     output_path.set_extension(format.get_extension());
 
-    if let SummaryDisposition::Separate(ref text) = summary {
+    if let SummaryDisposition::Separate(text) = summary {
         let mut summary_path = output_path.clone();
         summary_path.set_extension("summary");
         let mut summary_file = OpenOptions::new()
@@ -172,17 +224,10 @@ fn output_report(
         .truncate(false)
         .open(&output_path)?;
 
-    if let SummaryDisposition::Combine(ref text) = summary {
+    if let SummaryDisposition::Combine(text) = summary {
         write!(file, "{text}\n")?;
     }
 
-    match format {
-        LogFormat::Legacy => AuditLogWriter::write_events_legacy(&mut file, events)?,
-        LogFormat::Simple => AuditLogWriter::write_events_simple(&mut file, events)?,
-        LogFormat::Json => {
-            let body = serde_json::to_string_pretty(events)?;
-            write!(file, "{body}\n")?;
-        }
-    }
+    write_report_body(&mut file, events, format)?;
     Ok(())
 }
