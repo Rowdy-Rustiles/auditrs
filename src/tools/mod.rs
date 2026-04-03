@@ -7,6 +7,8 @@
 //! - `report`: reporting and analysis helpers for generating human-readable
 //!   summaries.
 
+use std::collections::{BTreeSet, HashMap};
+
 pub mod dump;
 pub mod report;
 pub mod search;
