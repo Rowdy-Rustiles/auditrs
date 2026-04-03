@@ -209,10 +209,11 @@ Examples:
                 .help("Aggregation dimension"),
         )
         .arg(
-            Arg::new("failed")
-                .long("failed")
-                .action(ArgAction::SetTrue)
-                .help("Only include failed events"),
+            Arg::new("summary")
+                .long("summary")
+                .value_name("TYPE")
+                .value_parser(["combine", "separate", "exclude"])
+                .help("Generate a summary report"),
         )
         .arg(
             Arg::new("top")

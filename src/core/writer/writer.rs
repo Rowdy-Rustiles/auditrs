@@ -364,15 +364,13 @@ impl AuditLogWriter {
         Ok(())
     }
 
-    /// Writes `events` to `path` in legacy format (overwrites if the file
-    /// exists).
+    /// Writes `events` to `path` in legacy format.
     ///
     /// **Parameters:**
     ///
     /// * `path`: The path to the file to write the events to.
     /// * `events`: The `AuditEvent`s to write.
-    pub fn write_events_legacy(path: impl AsRef<Path>, events: &[AuditEvent]) -> Result<()> {
-        let mut file = File::create(path.as_ref())?;
+    pub fn write_events_legacy(file: &mut File, events: &[AuditEvent]) -> Result<()> {
         for event in events {
             write!(file, "{}", Self::format_legacy_event(event)?)?;
         }
@@ -380,15 +378,13 @@ impl AuditLogWriter {
         Ok(())
     }
 
-    /// Writes `events` to `path` in simple format (overwrites if the file
-    /// exists).
+    /// Writes `events` to `path` in simple format.
     ///
     /// **Parameters:**
     ///
     /// * `path`: The path to the file to write the events to.
     /// * `events`: The `AuditEvent`s to write.
-    pub fn write_events_simple(path: impl AsRef<Path>, events: &[AuditEvent]) -> Result<()> {
-        let mut file = File::create(path.as_ref())?;
+    pub fn write_events_simple(file: &mut File, events: &[AuditEvent]) -> Result<()> {
         for event in events {
             write!(file, "{}", Self::format_simple_event(event))?;
         }
@@ -396,21 +392,22 @@ impl AuditLogWriter {
         Ok(())
     }
 
-    /// Writes `events` to `path` as a single top-level JSON array (overwrites
-    /// if the file exists). Uses the same incremental array layout as
-    /// active logs.
+    /// Writes `events` to `path` as a single top-level JSON array ).
+    /// Uses the same incremental array layout as active logs.
+    ///
+    /// Note - this function is deprecated and unused. For writing JSON arrays
+    /// to a log file (primary/active logs), the custom json writing logic in
+    /// this file should be used instead as it maintains JSON array
+    /// structure with streamed writes. In the case of report generation,
+    /// serde's json pretty printing logic should be used instead
+    /// as the complete array of events is present for writing a complete JSON
+    /// array.
     ///
     /// **Parameters:**
     ///
     /// * `path`: The path to the file to write the events to.
     /// * `events`: The `AuditEvent`s to write.
-    pub fn write_events_json(path: impl AsRef<Path>, events: &[AuditEvent]) -> Result<()> {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(true)
-            .open(path.as_ref())?;
+    pub fn write_events_json(file: &mut File, events: &[AuditEvent]) -> Result<()> {
         if events.is_empty() {
             write!(file, "[]\n")?;
             file.flush()?;
@@ -418,7 +415,7 @@ impl AuditLogWriter {
         }
         for event in events {
             let event_str = Self::format_json_event_pretty(event)?;
-            Self::append_json_array_element(&mut file, &event_str, "report")?;
+            Self::append_json_array_element(file, &event_str, "report")?;
         }
         Ok(())
     }

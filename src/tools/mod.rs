@@ -10,3 +10,10 @@
 pub mod dump;
 pub mod report;
 pub mod search;
+
+/// How summary text should be emitted relative to the main report file.
+enum SummaryDisposition {
+    Exclude,
+    Combine(String),
+    Separate(String),
+}
