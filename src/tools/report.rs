@@ -31,7 +31,13 @@ use crate::{
     },
 };
 
-/// Prints a debug dump of primary-log events for the configured log format.
+/// Entry point for report generation; examines the CLI arguments and handles
+/// the delegation of argument fulfillment to the appropriate helper functions.
+///
+/// **Parameters:**
+///
+/// * `state`: The current state of the auditrs daemon.
+/// * `matches`: The CLI arguments to the report command.
 pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
     let primary_directory = PathBuf::from(&state.config.primary_directory);
 
@@ -73,6 +79,12 @@ pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
+/// Generates a default path for the report file based on the current timestamp
+/// and output format.
+///
+/// **Parameters:**
+///
+/// * `format`: The output format of the report.
 fn default_report_path(format: LogFormat) -> PathBuf {
     let ts = current_utc_string().replace(':', "-");
     PathBuf::from(format!(
@@ -82,6 +94,12 @@ fn default_report_path(format: LogFormat) -> PathBuf {
     ))
 }
 
+/// Applies the time window specified by the CLI arguments to the events.
+///
+/// **Parameters:**
+///
+/// * `matches`: The CLI arguments to the report command.
+/// * `events`: The events to apply the time window to.
 fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Result<Vec<AuditEvent>> {
     let since = if let Some(since) = matches.get_one::<String>("since") {
         parse_rfc3339_timestamp(since)
@@ -101,7 +119,12 @@ fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Resul
     Ok(events)
 }
 
-
+/// Normalizes the path interaction key for the report. Paths should be in the
+/// format `/path/to/file`.
+///
+/// **Parameters:**
+///
+/// * `path`: The path to normalize.
 fn normalize_path_interaction_key(path: &str) -> String {
     let t = path.trim();
     if t.is_empty() {
@@ -118,16 +141,12 @@ fn normalize_path_interaction_key(path: &str) -> String {
     s
 }
 
-fn normalize_cwd_key(cwd: &str) -> String {
-    normalize_path_interaction_key(cwd)
-}
-
-fn exclude_path_from_interaction_stats(path: &str) -> bool {
-    path.starts_with("/usr/bin/") || path.starts_with("/usr/sbin/")
-}
-
 /// Last non-empty `cwd` from a CWD record in this event (audit typically emits
 /// one per event).
+///
+/// **Parameters:**
+///
+/// * `event`: The event to get the working cwd from.
 fn event_working_cwd(event: &AuditEvent) -> Option<String> {
     let mut cwd = None;
     for record in &event.records {
@@ -143,12 +162,17 @@ fn event_working_cwd(event: &AuditEvent) -> Option<String> {
 }
 
 /// Expresses `path_raw` relative to `cwd_raw` for display and aggregation keys.
+///
+/// **Parameters:**
+///
+/// * `cwd_raw`: The raw cwd path.
+/// * `path_raw`: The raw path to express relative to the cwd.
 fn path_relative_to_cwd(cwd_raw: &str, path_raw: &str) -> String {
     let p = path_raw.trim();
     if p.is_empty() {
         return String::new();
     }
-    let cwd_norm = normalize_cwd_key(cwd_raw);
+    let cwd_norm = normalize_path_interaction_key(cwd_raw);
     if cwd_norm.is_empty() {
         return String::new();
     }
@@ -169,16 +193,27 @@ fn path_relative_to_cwd(cwd_raw: &str, path_raw: &str) -> String {
     normalize_path_interaction_key(p)
 }
 
+/// Adds a path to the path interactions map under the given cwd.
+///
+/// **Parameters:**
+///
+/// * `map`: The map to add the path to.
+/// * `cwd_raw`: The raw cwd path.
+/// * `path_raw`: The raw path to add.
 fn add_path_under_cwd(
     map: &mut HashMap<String, HashMap<String, u32>>,
     cwd_raw: &str,
     path_raw: &str,
 ) {
     let trimmed = path_raw.trim();
-    if trimmed.is_empty() || exclude_path_from_interaction_stats(trimmed) {
+
+    // We remove paths that are in the system bin directories from the report. These
+    // are typically not user-initiated and are instead represented by the command
+    // entries in the report.
+    if trimmed.is_empty() || trimmed.starts_with("/usr/bin/") || trimmed.starts_with("/usr/sbin/") {
         return;
     }
-    let cwd_key = normalize_cwd_key(cwd_raw);
+    let cwd_key = normalize_path_interaction_key(cwd_raw);
     if cwd_key.is_empty() {
         return;
     }
@@ -193,6 +228,11 @@ fn add_path_under_cwd(
         .or_insert(1);
 }
 
+/// Collects the forensics aggregates from the events.
+///
+/// **Parameters:**
+///
+/// * `events`: The events to collect the forensics aggregates from.
 fn collect_forensics_aggregates(events: &[AuditEvent]) -> ForensicsAggregates {
     let mut uids = BTreeSet::new();
     let mut auids = BTreeSet::new();
@@ -245,6 +285,14 @@ fn collect_forensics_aggregates(events: &[AuditEvent]) -> ForensicsAggregates {
     }
 }
 
+/// Formats the summary text for the report.
+///
+/// **Parameters:**
+///
+/// * `event_count`: The number of events in the report.
+/// * `earliest`: The earliest event timestamp.
+/// * `latest`: The latest event timestamp.
+/// * `record_type_counts`: The counts of each record type.
 fn format_summary_text(
     event_count: usize,
     earliest: Option<SystemTime>,
@@ -329,6 +377,12 @@ fn format_summary_text(
     lines.join("\n") + "\n"
 }
 
+/// Builds the summary disposition for the report.
+///
+/// **Parameters:**
+///
+/// * `matches`: The CLI arguments to the report command.
+/// * `events`: The events to build the summary disposition for.
 fn build_summary_disposition(matches: &ArgMatches, events: &[AuditEvent]) -> SummaryDisposition {
     let summary_type = matches
         .get_one::<String>("summary")
@@ -366,6 +420,13 @@ fn build_summary_disposition(matches: &ArgMatches, events: &[AuditEvent]) -> Sum
     }
 }
 
+/// Writes the report body to the writer.
+///
+/// **Parameters:**
+///
+/// * `w`: The writer to write the report body to.
+/// * `events`: The events to write the report body for.
+/// * `format`: The format of the report.
 fn write_report_body<W: Write>(w: &mut W, events: &[AuditEvent], format: LogFormat) -> Result<()> {
     match format {
         LogFormat::Legacy => AuditLogWriter::write_events_legacy(w, events)?,
@@ -378,6 +439,13 @@ fn write_report_body<W: Write>(w: &mut W, events: &[AuditEvent], format: LogForm
     Ok(())
 }
 
+/// Prints the report to stdout.
+///
+/// **Parameters:**
+///
+/// * `events`: The events to print the report for.
+/// * `format`: The format of the report.
+/// * `summary`: The summary disposition of the report.
 fn print_report(
     events: &[AuditEvent],
     format: LogFormat,
@@ -394,6 +462,14 @@ fn print_report(
     Ok(())
 }
 
+/// Outputs the report to a file.
+///
+/// **Parameters:**
+///
+/// * `events`: The events to output the report for.
+/// * `output_path`: The path to output the report to.
+/// * `format`: The format of the report.
+/// * `summary`: The summary disposition of the report.
 fn output_report(
     events: &[AuditEvent],
     mut output_path: PathBuf,

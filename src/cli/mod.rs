@@ -60,13 +60,12 @@
 //! **Flags:**
 //!
 //! - `--since TIME` / `--until TIME` — report time window.
-//! - `--by user|result|syscall|exe|type` — aggregation dimension.
 //! - `--failed` — only include failed events.
-//! - `--top N` — show only the top *N* buckets per aggregation.
-//! - `--format legacy|simple|json` — report output format.
-//! - `--no-print` — print to stdout instead of saving; `--summary`
-//!   combine/separate prints the summary first.
-//! - With no `-o`/`--output` and without `--no-print`, writes
+//! - `--format legacy|simple|json` — report output format (default: json).
+//! - `--no-save` — print to stdout instead of saving; 
+//! - `--summary combine|separate|exclude` — generate a summary report with the given disposition (default: combine).
+//! - `-o`/`--output PATH` — write the report to the given path.
+//! - With no `-o`/`--output` and without `--no-save`, writes
 //!   `./reports/report_<timestamp>.<ext>`.
 //!
 //! ## `config` — read and update settings

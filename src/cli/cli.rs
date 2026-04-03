@@ -202,24 +202,11 @@ Examples:
                 ),
         )
         .arg(
-            Arg::new("by")
-                .long("by")
-                .value_name("DIMENSION")
-                .value_parser(["user", "result", "syscall", "exe", "type"])
-                .help("Aggregation dimension"),
-        )
-        .arg(
             Arg::new("summary")
                 .long("summary")
                 .value_name("TYPE")
                 .value_parser(["combine", "separate", "exclude"])
                 .help("Generate a summary report"),
-        )
-        .arg(
-            Arg::new("top")
-                .long("top")
-                .value_name("N")
-                .help("Only show the top-N buckets per aggregation"),
         )
         .arg(
             Arg::new("format")
