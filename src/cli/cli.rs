@@ -171,13 +171,35 @@ fn build_report() -> ClapCommand {
             Arg::new("since")
                 .long("since")
                 .value_name("TIME")
-                .help("Start of the time window for the report"),
+                .help("Start of the time window for the report (inclusive)")
+                .long_help(
+                    "Start time of the window for the report (inclusive).\n
+Input should be formatted as a RFC3339 timestamp, see the following resources for more information:
+<https://time.now/tool/rfc-3339-converter/>, <https://datatracker.ietf.org/doc/html/rfc3339>.
+YYYY-MM-DDTHH:MM:SS[.mmm]Z
+
+Examples:
+- 2026-03-04T10:00:00Z
+- 2026-03-04T10:00:00.000Z
+                ",
+                ),
         )
         .arg(
             Arg::new("until")
                 .long("until")
                 .value_name("TIME")
-                .help("End of the time window for the report"),
+                .help("End of the time window for the report (exclusive)")
+                .long_help(
+                    "End time of the window for the report (exclusive).\n
+Input should be formatted as a RFC3339 timestamp, see the following resources for more information:
+<https://time.now/tool/rfc-3339-converter/>, <https://datatracker.ietf.org/doc/html/rfc3339>.
+YYYY-MM-DDTHH:MM:SS[.mmm]Z
+
+Examples:
+- 2026-03-04T10:00:00Z
+- 2026-03-04T10:00:00.000Z
+                ",
+                ),
         )
         .arg(
             Arg::new("by")

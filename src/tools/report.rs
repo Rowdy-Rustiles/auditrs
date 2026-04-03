@@ -4,7 +4,7 @@
 //! audit logs (e.g. per-user activity, rule hit counts, or anomaly snapshots),
 //! complementing the lower-level `search` capabilities.
 
-use std::{fs::create_dir_all, path::PathBuf, str::FromStr};
+use std::{fs::create_dir_all, path::PathBuf, str::FromStr, time::SystemTime};
 
 use anyhow::Result;
 use clap::ArgMatches;
@@ -13,7 +13,7 @@ use crate::{
     config::LogFormat,
     core::{correlator::AuditEvent, writer::AuditLogWriter},
     state::State,
-    utils::{read_from_json, read_from_legacy, read_from_simple},
+    utils::{parse_rfc3339_timestamp, read_from_json, read_from_legacy, read_from_simple},
 };
 
 /// Prints a debug dump of primary-log events for the configured log format.
@@ -23,11 +23,13 @@ pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
     // We read the primary logs into a vector of `AuditEvent`s so that
     // they can be easily iterated over and aggregated for summary collections
     // and statistics.
-    let events = match state.config.log_format {
+    let mut events = match state.config.log_format {
         LogFormat::Legacy => read_from_legacy(&primary_directory),
         LogFormat::Simple => read_from_simple(&primary_directory),
         LogFormat::Json => read_from_json(&primary_directory),
     };
+
+    events = apply_time_window(&matches, events)?;
 
     // Extra conversion as a validation check, format value should be validated by
     // the CLI parser.
@@ -43,6 +45,25 @@ pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
 
     println!("{:?}", events);
     Ok(())
+}
+
+fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Result<Vec<AuditEvent>> {
+    let since = if let Some(since) = matches.get_one::<String>("since") {
+        parse_rfc3339_timestamp(since)
+            .map_err(|e| anyhow::anyhow!("Invalid since timestamp: {}", e))?
+    } else {
+        SystemTime::UNIX_EPOCH
+    };
+
+    let until = if let Some(until) = matches.get_one::<String>("until") {
+        parse_rfc3339_timestamp(until)
+            .map_err(|e| anyhow::anyhow!("Invalid until timestamp: {}", e))?
+    } else {
+        SystemTime::now()
+    };
+
+    events.retain(|event| event.timestamp >= since && event.timestamp < until);
+    Ok(events)
 }
 
 fn output_report(events: &[AuditEvent], mut output_path: PathBuf, format: LogFormat) -> Result<()> {

@@ -15,7 +15,7 @@
 use anyhow::Result;
 use serde_json;
 use std::fs::{File, OpenOptions, create_dir_all};
-use std::io::Write;
+use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 
@@ -351,6 +351,8 @@ impl AuditLogWriter {
 
             let new_len = len - 3;
             file.set_len(new_len)?;
+            // reset cursor to avoid writing in null bytes for next write
+            file.seek(SeekFrom::Start(new_len))?;
             if new_len > 2 {
                 write!(file, ",\n")?;
             }

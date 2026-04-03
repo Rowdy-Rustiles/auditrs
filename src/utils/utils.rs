@@ -129,3 +129,13 @@ pub fn strip_block_comments(content: &str) -> String {
 
     result
 }
+
+/// Parse an RFC3339 timestamp string into a `SystemTime`.
+///
+/// **Parameters:**
+///
+/// * `timestamp`: The RFC3339 timestamp string to parse.
+pub fn parse_rfc3339_timestamp(timestamp: &str) -> Result<SystemTime> {
+    let dt = DateTime::parse_from_rfc3339(timestamp)?;
+    Ok(SystemTime::from(dt))
+}

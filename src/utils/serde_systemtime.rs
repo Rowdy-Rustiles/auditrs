@@ -4,6 +4,8 @@
 use serde::{Deserialize, Deserializer, Serializer};
 use std::time::SystemTime;
 
+use crate::utils::parse_rfc3339_timestamp;
+
 use super::systemtime_to_utc_string;
 
 /// Serializes `SystemTime` using the same format as the JSON log writer.
@@ -21,6 +23,6 @@ where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    let dt = chrono::DateTime::parse_from_rfc3339(s.trim()).map_err(serde::de::Error::custom)?;
+    let dt = parse_rfc3339_timestamp(s.trim()).map_err(serde::de::Error::custom)?;
     Ok(SystemTime::from(dt))
 }
