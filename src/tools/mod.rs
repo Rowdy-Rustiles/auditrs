@@ -18,3 +18,14 @@ enum SummaryDisposition {
     Combine(String),
     Separate(String),
 }
+
+/// Aggregates identity and path-like fields from audit records (SYSCALL, PATH,
+/// CWD, etc.).
+struct ForensicsAggregates {
+    uids: BTreeSet<String>,
+    auids: BTreeSet<String>,
+    /// Path interactions with the occurrence counts for each CWD.
+    path_interactions: HashMap<String, HashMap<String, u32>>,
+    /// SYSCALL `comm` values (short command names) with occurrence counts.
+    command_counts: HashMap<String, u32>,
+}

@@ -5,10 +5,10 @@
 //! complementing the lower-level `search` capabilities.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     fs::{OpenOptions, create_dir_all},
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::SystemTime,
 };
@@ -20,7 +20,7 @@ use crate::{
     config::LogFormat,
     core::{correlator::AuditEvent, writer::AuditLogWriter},
     state::State,
-    tools::SummaryDisposition,
+    tools::{ForensicsAggregates, SummaryDisposition},
     utils::{
         current_utc_string,
         parse_rfc3339_timestamp,
@@ -101,11 +101,156 @@ fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Resul
     Ok(events)
 }
 
+
+fn normalize_path_interaction_key(path: &str) -> String {
+    let t = path.trim();
+    if t.is_empty() {
+        return String::new();
+    }
+    let mut s = t.to_string();
+    if t.starts_with("./") {
+        s = s[1..].to_string();
+    }
+
+    while s.len() > 1 && s.ends_with('/') {
+        s.pop();
+    }
+    s
+}
+
+fn normalize_cwd_key(cwd: &str) -> String {
+    normalize_path_interaction_key(cwd)
+}
+
+fn exclude_path_from_interaction_stats(path: &str) -> bool {
+    path.starts_with("/usr/bin/") || path.starts_with("/usr/sbin/")
+}
+
+/// Last non-empty `cwd` from a CWD record in this event (audit typically emits
+/// one per event).
+fn event_working_cwd(event: &AuditEvent) -> Option<String> {
+    let mut cwd = None;
+    for record in &event.records {
+        if record.record_type.as_audit_str() == "CWD" {
+            if let Some(c) = record.fields.get("cwd") {
+                if !c.trim().is_empty() {
+                    cwd = Some(c.clone());
+                }
+            }
+        }
+    }
+    cwd
+}
+
+/// Expresses `path_raw` relative to `cwd_raw` for display and aggregation keys.
+fn path_relative_to_cwd(cwd_raw: &str, path_raw: &str) -> String {
+    let p = path_raw.trim();
+    if p.is_empty() {
+        return String::new();
+    }
+    let cwd_norm = normalize_cwd_key(cwd_raw);
+    if cwd_norm.is_empty() {
+        return String::new();
+    }
+
+    if p.starts_with('/') {
+        let cwd_p = Path::new(&cwd_norm);
+        let path_p = Path::new(p);
+        if let Ok(rest) = path_p.strip_prefix(cwd_p) {
+            let s = rest.to_string_lossy().to_string();
+            if s.is_empty() {
+                return ".".to_string();
+            }
+            return normalize_path_interaction_key(&s);
+        }
+        return normalize_path_interaction_key(p);
+    }
+
+    normalize_path_interaction_key(p)
+}
+
+fn add_path_under_cwd(
+    map: &mut HashMap<String, HashMap<String, u32>>,
+    cwd_raw: &str,
+    path_raw: &str,
+) {
+    let trimmed = path_raw.trim();
+    if trimmed.is_empty() || exclude_path_from_interaction_stats(trimmed) {
+        return;
+    }
+    let cwd_key = normalize_cwd_key(cwd_raw);
+    if cwd_key.is_empty() {
+        return;
+    }
+    let rel = path_relative_to_cwd(cwd_raw, trimmed);
+    if rel.is_empty() {
+        return;
+    }
+    map.entry(cwd_key)
+        .or_insert_with(HashMap::new)
+        .entry(rel)
+        .and_modify(|c| *c += 1)
+        .or_insert(1);
+}
+
+fn collect_forensics_aggregates(events: &[AuditEvent]) -> ForensicsAggregates {
+    let mut uids = BTreeSet::new();
+    let mut auids = BTreeSet::new();
+    let mut path_interactions: HashMap<String, HashMap<String, u32>> = HashMap::new();
+    let mut command_counts: HashMap<String, u32> = HashMap::new();
+
+    for event in events {
+        let cwd_for_event = event_working_cwd(event);
+
+        for record in &event.records {
+            let rt = record.record_type.as_audit_str();
+            if let Some(u) = record.fields.get("uid") {
+                if !u.is_empty() {
+                    uids.insert(u.clone());
+                }
+            }
+            if let Some(a) = record.fields.get("auid") {
+                if !a.is_empty() {
+                    auids.insert(a.clone());
+                }
+            }
+
+            if rt == "SYSCALL" {
+                if let Some(c) = record.fields.get("comm") {
+                    if !c.is_empty() {
+                        *command_counts.entry(c.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+
+            if let Some(ref cwd) = cwd_for_event {
+                if rt == "PATH" {
+                    if let Some(name) = record.fields.get("name") {
+                        add_path_under_cwd(&mut path_interactions, cwd, name);
+                    }
+                } else if rt == "SYSCALL" {
+                    if let Some(exe) = record.fields.get("exe") {
+                        add_path_under_cwd(&mut path_interactions, cwd, exe);
+                    }
+                }
+            }
+        }
+    }
+
+    ForensicsAggregates {
+        uids,
+        auids,
+        path_interactions,
+        command_counts,
+    }
+}
+
 fn format_summary_text(
     event_count: usize,
     earliest: Option<SystemTime>,
     latest: Option<SystemTime>,
     record_type_counts: &HashMap<String, u32>,
+    forensics: &ForensicsAggregates,
 ) -> String {
     let mut lines: Vec<String> = Vec::new();
     lines.push("summary:".to_string());
@@ -122,6 +267,57 @@ fn format_summary_text(
             .map(systemtime_to_utc_string)
             .unwrap_or_else(|| "(none)".to_string())
     ));
+
+    lines.push("  uids_present:".to_string());
+    if forensics.uids.is_empty() {
+        lines.push("    (none)".to_string());
+    } else {
+        for u in &forensics.uids {
+            lines.push(format!("    {u}"));
+        }
+    }
+
+    lines.push("  auids_present:".to_string());
+    if forensics.auids.is_empty() {
+        lines.push("    (none)".to_string());
+    } else {
+        for a in &forensics.auids {
+            lines.push(format!("    {a}"));
+        }
+    }
+
+    lines.push("  path_interactions:".to_string());
+    if forensics.path_interactions.is_empty() {
+        lines.push("    (none)".to_string());
+    } else {
+        let mut cwds: Vec<&String> = forensics.path_interactions.keys().collect();
+        cwds.sort();
+        for cwd in cwds {
+            lines.push(format!("    {cwd}:"));
+            let inner = &forensics.path_interactions[cwd];
+            let mut pairs: Vec<(&String, u32)> = inner.iter().map(|(p, c)| (p, *c)).collect();
+            pairs.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+            for (path, count) in pairs {
+                lines.push(format!("\t    {path}: {count}"));
+            }
+        }
+    }
+
+    lines.push("  commands_run:".to_string());
+    if forensics.command_counts.is_empty() {
+        lines.push("    (none)".to_string());
+    } else {
+        let mut pairs: Vec<(&String, u32)> = forensics
+            .command_counts
+            .iter()
+            .map(|(c, n)| (c, *n))
+            .collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+        for (comm, count) in pairs {
+            lines.push(format!("    {comm}: {count}"));
+        }
+    }
+
     lines.push("  record_type_counts:".to_string());
 
     let mut keys: Vec<&String> = record_type_counts.keys().collect();
@@ -155,7 +351,14 @@ fn build_summary_disposition(matches: &ArgMatches, events: &[AuditEvent]) -> Sum
     let earliest = events.iter().map(|event| event.timestamp).min();
     let latest = events.iter().map(|event| event.timestamp).max();
 
-    let text = format_summary_text(events.len(), earliest, latest, &record_type_counts);
+    let forensics = collect_forensics_aggregates(events);
+    let text = format_summary_text(
+        events.len(),
+        earliest,
+        latest,
+        &record_type_counts,
+        &forensics,
+    );
 
     match summary_type {
         "separate" => SummaryDisposition::Separate(text),

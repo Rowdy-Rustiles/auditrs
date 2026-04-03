@@ -17,7 +17,7 @@ use serde_json;
 use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::FileExt;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use crate::config::{AuditConfig, LogFormat};
 use crate::core::{
