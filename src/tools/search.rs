@@ -25,8 +25,8 @@ use crate::utils::{
     systemtime_to_utc_string,
 };
 
-/// Runs a search over primary audit logs using CLI filters and the query
-/// expression.
+/// Loads primary logs, applies CLI filters and the query expression, and prints
+/// matching events in simple or JSON format.
 ///
 /// **Parameters:**
 ///
@@ -123,9 +123,13 @@ pub fn search_events(state: &State, matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-/// Splits `--field` into a key name and an optional `value` when written as
-/// `name=value`. The audit field name is only ever the part before the first
-/// `=`.
+/// Parses the `--field` flag into a field name and optional value when the
+/// argument uses `name=value` form; otherwise returns the whole string as the
+/// field name.
+///
+/// **Parameters:**
+///
+/// * `field`: Raw `--field` value, or `None` if the flag was not passed.
 fn parse_field_flag(field: Option<&str>) -> (Option<&str>, Option<&str>) {
     let Some(raw) = field.map(str::trim).filter(|s| !s.is_empty()) else {
         return (None, None);
@@ -141,6 +145,13 @@ fn parse_field_flag(field: Option<&str>) -> (Option<&str>, Option<&str>) {
     (Some(raw), None)
 }
 
+/// Retains events whose timestamp falls in `[since, until)` from `--since` /
+/// `--until` (RFC3339), defaulting to the full range when a bound is omitted.
+///
+/// **Parameters:**
+///
+/// * `matches`: Parsed `search` subcommand arguments.
+/// * `events`: Events read from primary logs before filtering.
 fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Result<Vec<AuditEvent>> {
     let since = if let Some(since) = matches.get_one::<String>("since") {
         parse_rfc3339_timestamp(since)
@@ -160,6 +171,13 @@ fn apply_time_window(matches: &ArgMatches, mut events: Vec<AuditEvent>) -> Resul
     Ok(events)
 }
 
+/// Returns whether the event satisfies `--type`: a category (`exec`, `file`,
+/// `auth`), or any record whose type matches the given audit or Rust-style name.
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `ty`: Value of `--type` (may be empty to match all).
 fn event_matches_type(event: &AuditEvent, ty: &str) -> bool {
     let t = ty.trim();
     if t.is_empty() {
@@ -174,13 +192,25 @@ fn event_matches_type(event: &AuditEvent, ty: &str) -> bool {
         .any(|r| record_type_matches_cli_label(r, t))
 }
 
-/// Matches either the auditd-style name (`CONFIG_CHANGE`) or the same form used
-/// in simple-log output (`ConfigChange` from `{:?}`).
+/// Returns whether the CLI type string matches this record’s type (auditd-style
+/// name such as `CONFIG_CHANGE`, or the Rust enum spelling such as `ConfigChange`).
+///
+/// **Parameters:**
+///
+/// * `record`: Parsed record whose `RecordType` is compared.
+/// * `t`: Type filter string from the user.
 fn record_type_matches_cli_label(record: &ParsedAuditRecord, t: &str) -> bool {
     record.record_type.as_audit_str().eq_ignore_ascii_case(t)
         || format!("{:?}", record.record_type).eq_ignore_ascii_case(t)
 }
 
+/// Returns whether `--type` names a built-in category and the event contains at
+/// least one record in that category’s record-type set.
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `cat`: Category name (`exec`, `file`, or `auth`; compared case-insensitively).
 fn record_type_category_matches(event: &AuditEvent, cat: &str) -> bool {
     match cat.to_ascii_lowercase().as_str() {
         "exec" => {
@@ -232,18 +262,28 @@ fn record_type_category_matches(event: &AuditEvent, cat: &str) -> bool {
     }
 }
 
+/// Audit field names used for `--user` filtering and `uid=…`-style user filters.
 const USER_FIELD_KEYS: &[&str] = &[
     "uid", "auid", "euid", "gid", "egid", "ouid", "fsuid", "loginuid", "suid", "ses",
 ];
 
+/// Returns whether `name` is one of the identity field keys (case-insensitive).
+///
+/// **Parameters:**
+///
+/// * `name`: Candidate field name, typically the left-hand side of `key=value`.
 fn is_user_identity_field(name: &str) -> bool {
     USER_FIELD_KEYS
         .iter()
         .any(|k| k.eq_ignore_ascii_case(name.trim()))
 }
 
-/// Rejects `--user key=value` when `key` is not an identity field (same set as
-/// [`USER_FIELD_KEYS`]).
+/// Validates `--user` when it uses `key=value` form: the key must appear in
+/// [`USER_FIELD_KEYS`].
+///
+/// **Parameters:**
+///
+/// * `raw`: Raw `--user` argument string.
 fn validate_user_filter_arg(raw: &str) -> Result<()> {
     let raw = raw.trim();
     if raw.is_empty() {
@@ -261,6 +301,13 @@ fn validate_user_filter_arg(raw: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns whether the event satisfies `--user`: plain text across identity
+/// fields, or `key=value` / `key=` limited to [`USER_FIELD_KEYS`].
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `user`: Raw `--user` argument (may include `uid=1000` form).
 fn event_matches_user(event: &AuditEvent, user: &str) -> bool {
     let raw = user.trim();
     if raw.is_empty() {
@@ -281,8 +328,14 @@ fn event_matches_user(event: &AuditEvent, user: &str) -> bool {
     user_matches_any_identity_field(event, raw)
 }
 
-/// `key=value`: match substring in that field only (same rules as `--field`
-/// key=value).
+/// Returns whether any record has `key` matching `val` by equality or substring
+/// (same idea as `key_value_matches` for `--field`, restricted to user keys).
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `key`: Identity field name (e.g. `uid`).
+/// * `val`: Needle matched against that field’s value.
 fn user_key_value_matches(event: &AuditEvent, key: &str, val: &str) -> bool {
     for record in &event.records {
         for (fk, fv) in &record.fields {
@@ -294,7 +347,13 @@ fn user_key_value_matches(event: &AuditEvent, key: &str, val: &str) -> bool {
     false
 }
 
-/// Plain text: match if any identity field value equals or contains `needle`.
+/// Returns whether any [`USER_FIELD_KEYS`] value on the event equals or contains
+/// `needle` (plain `--user` without `key=value`).
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `needle`: Free-text user filter.
 fn user_matches_any_identity_field(event: &AuditEvent, needle: &str) -> bool {
     for record in &event.records {
         for (fk, fv) in &record.fields {
@@ -310,6 +369,13 @@ fn user_matches_any_identity_field(event: &AuditEvent, needle: &str) -> bool {
     false
 }
 
+/// Returns whether the event satisfies `--result` by inspecting `success` on
+/// records (typically SYSCALL).
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `want`: Either `success` or `failed` from the CLI.
 fn event_matches_result(event: &AuditEvent, want: &str) -> bool {
     for record in &event.records {
         if let Some(s) = record.fields.get("success") {
@@ -330,6 +396,14 @@ fn event_matches_result(event: &AuditEvent, want: &str) -> bool {
     false
 }
 
+/// Returns whether the event matches the main search query: empty query with
+/// optional `--field`-only semantics, `key=value`, or free text.
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `query`: Effective query string (positional and/or `--field=…` value).
+/// * `restrict_field`: Field name from `--field` when not using `field=value`, if any.
 fn event_matches_query(event: &AuditEvent, query: &str, restrict_field: Option<&str>) -> bool {
     let q = query.trim();
     if q.is_empty() {
@@ -353,6 +427,13 @@ fn event_matches_query(event: &AuditEvent, query: &str, restrict_field: Option<&
     free_text_matches(event, q, restrict_field)
 }
 
+/// Returns whether any record in the event carries a field whose name matches
+/// `field` (case-insensitive).
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `field`: Audit field name.
 fn event_has_field_key(event: &AuditEvent, field: &str) -> bool {
     event
         .records
@@ -360,6 +441,15 @@ fn event_has_field_key(event: &AuditEvent, field: &str) -> bool {
         .any(|r| r.fields.keys().any(|k| k.eq_ignore_ascii_case(field)))
 }
 
+/// Returns whether `key=value` appears on the event, optionally requiring `key`
+/// to match `--field` when only a field name was passed.
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `key`: Left-hand side of the query’s `key=value` pair.
+/// * `val`: Right-hand side substring matched in the field value.
+/// * `restrict_field`: If set, `key` must match this field name.
 fn key_value_matches(
     event: &AuditEvent,
     key: &str,
@@ -381,6 +471,14 @@ fn key_value_matches(
     false
 }
 
+/// Returns whether free-text `needle` appears in record types (when not
+/// restricted) or in field values, optionally scoped to `--field`.
+///
+/// **Parameters:**
+///
+/// * `event`: Event to test.
+/// * `needle`: Search string (case-insensitive for values and type names).
+/// * `restrict_field`: If set, only this field’s values are searched.
 fn free_text_matches(event: &AuditEvent, needle: &str, restrict_field: Option<&str>) -> bool {
     let needle_lower = needle.to_lowercase();
     for record in &event.records {
@@ -407,6 +505,11 @@ fn free_text_matches(event: &AuditEvent, needle: &str, restrict_field: Option<&s
     false
 }
 
+/// Writes a short count line and each event using the simple (`Display`) format.
+///
+/// **Parameters:**
+///
+/// * `events`: Matched events to print to stdout.
 fn print_simple(events: &[AuditEvent]) -> Result<()> {
     let mut out = io::stdout().lock();
     writeln!(out, "Found {} events \n", events.len())?;
@@ -416,6 +519,12 @@ fn print_simple(events: &[AuditEvent]) -> Result<()> {
     Ok(())
 }
 
+/// Writes a count line and a pretty-printed JSON array of events; record types
+/// use the Rust enum spelling (`ConfigChange`) to align with simple logs.
+///
+/// **Parameters:**
+///
+/// * `events`: Matched events to serialize to stdout.
 fn print_json(events: &[AuditEvent]) -> Result<()> {
     let mut out = io::stdout().lock();
     // Use the same record-type spelling as simple-format logs (`record_type:
