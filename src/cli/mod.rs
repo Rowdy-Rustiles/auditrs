@@ -62,8 +62,9 @@
 //! - `--since TIME` / `--until TIME` — report time window.
 //! - `--failed` — only include failed events.
 //! - `--format legacy|simple|json` — report output format (default: json).
-//! - `--no-save` — print to stdout instead of saving; 
-//! - `--summary combine|separate|exclude` — generate a summary report with the given disposition (default: combine).
+//! - `--no-save` — print to stdout instead of saving;
+//! - `--summary combine|separate|exclude` — generate a summary report with the
+//!   given disposition (default: combine).
 //! - `-o`/`--output PATH` — write the report to the given path.
 //! - With no `-o`/`--output` and without `--no-save`, writes
 //!   `./reports/report_<timestamp>.<ext>`.

@@ -63,16 +63,31 @@ pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
 
     let no_save = matches.get_flag("no_save");
 
+    let summary_only = matches.get_flag("summary_only");
+
+    if summary == SummaryDisposition::Exclude && summary_only {
+        return Err(anyhow::anyhow!(
+            "Cannot use --summary-only with --summary=exclude"
+        ));
+    }
+
     if no_save {
-        print_report(&events, output_format, &summary)?;
+        print_report(&events, output_format, &summary, summary_only)?;
     } else if let Some(output_path) = matches.get_one::<String>("output_path") {
-        output_report(&events, PathBuf::from(output_path), output_format, &summary)?;
+        output_report(
+            &events,
+            PathBuf::from(output_path),
+            output_format,
+            &summary,
+            summary_only,
+        )?;
     } else {
         output_report(
             &events,
             default_report_path(output_format),
             output_format,
             &summary,
+            summary_only,
         )?;
     }
 
@@ -450,6 +465,7 @@ fn print_report(
     events: &[AuditEvent],
     format: LogFormat,
     summary: &SummaryDisposition,
+    summary_only: bool,
 ) -> Result<()> {
     let mut out = io::stdout().lock();
     match summary {
@@ -458,7 +474,9 @@ fn print_report(
             write!(out, "{text}\n")?;
         }
     }
-    write_report_body(&mut out, events, format)?;
+    if !summary_only {
+        write_report_body(&mut out, events, format)?;
+    }
     Ok(())
 }
 
@@ -475,6 +493,7 @@ fn output_report(
     mut output_path: PathBuf,
     format: LogFormat,
     summary: &SummaryDisposition,
+    summary_only: bool,
 ) -> Result<()> {
     if let Some(parent) = output_path.parent() {
         if !parent.exists() {
@@ -507,6 +526,8 @@ fn output_report(
         write!(file, "{text}\n")?;
     }
 
-    write_report_body(&mut file, events, format)?;
+    if !summary_only {
+        write_report_body(&mut file, events, format)?;
+    }
     Ok(())
 }

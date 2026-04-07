@@ -15,12 +15,14 @@ pub mod search;
 
 /// How summary text should be emitted relative to the main report file or
 /// stdout.
+#[derive(Debug, PartialEq)]
 enum SummaryDisposition {
     /// Exclude the summary text from the report.
     Exclude,
     /// Combine the summary text with the report body.
     Combine(String),
-    /// Separate the summary text from the report body (functions like `combine` when `--no-save` is specified).
+    /// Separate the summary text from the report body (functions like `combine`
+    /// when `--no-save` is specified).
     Separate(String),
 }
 

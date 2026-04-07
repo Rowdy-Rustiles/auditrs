@@ -109,7 +109,11 @@ fn ensure_required_directories() -> Result<()> {
 
     // Ensure log directories exist based on current config.
     let cfg = load_config().context("Could not load config to initialize directories")?;
-    for dir in [&cfg.active_directory, &cfg.journal_directory, &cfg.primary_directory] {
+    for dir in [
+        &cfg.active_directory,
+        &cfg.journal_directory,
+        &cfg.primary_directory,
+    ] {
         fs::create_dir_all(dir)
             .with_context(|| format!("Could not create log directory {}", dir))?;
     }

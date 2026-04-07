@@ -222,6 +222,12 @@ Examples:
                 .help("Do not save the report; print it to stdout (summary at top for combine/separate)"),
         )
         .arg(
+            Arg::new("summary_only")
+                .long("summary-only")
+                .action(ArgAction::SetTrue)
+                .help("Only print the summary; do not print the report body"),
+        )
+        .arg(
             Arg::new("output_path")
                 .short('o')
                 .long("output")
