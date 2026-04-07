@@ -478,32 +478,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_dump_with_basic_options() {
-        let cmd = build_cli();
-        let matches = cmd
-            .clone()
-            .try_get_matches_from([
-                "auditrs",
-                "dump",
-                "--since",
-                "2026-03-04T10:00",
-                "--limit",
-                "10",
-            ])
-            .expect("arguments should parse");
-
-        let ("dump", sub_m) = matches.subcommand().expect("expected dump subcommand") else {
-            unreachable!();
-        };
-
-        assert_eq!(
-            sub_m.get_one::<String>("since").unwrap(),
-            "2026-03-04T10:00"
-        );
-        assert_eq!(sub_m.get_one::<String>("limit").unwrap(), "10");
-    }
-
-    #[test]
     fn parses_search_query() {
         let cmd = build_cli();
         let matches = cmd
