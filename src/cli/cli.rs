@@ -22,76 +22,11 @@ pub fn build_cli() -> ClapCommand {
         .subcommand(ClapCommand::new("status").about("Show whether the daemon is running"))
         .subcommand(build_filter())
         .subcommand(build_watch())
-        .subcommand(build_dump())
         .subcommand(build_search())
         .subcommand(build_report())
         .subcommand(build_config())
 }
 
-/// Builds the `dump` subcommand.
-///
-/// The `dump` command writes matching audit events to stdout or an output
-/// file, with optional filters for time range, event type, user, result,
-/// format, and follow mode.
-fn build_dump() -> ClapCommand {
-    ClapCommand::new("dump")
-        .about("Dump audit events to a file or stdout")
-        .arg(
-            Arg::new("since")
-                .long("since")
-                .value_name("TIME")
-                .help("Only include events at or after this time (e.g. 2026-03-04T10:00, -1h)"),
-        )
-        .arg(
-            Arg::new("until")
-                .long("until")
-                .value_name("TIME")
-                .help("Only include events strictly before this time"),
-        )
-        .arg(
-            Arg::new("type")
-                .long("type")
-                .value_name("EVENT_TYPE")
-                .help("Filter by event type (e.g. exec, file, auth)"),
-        )
-        .arg(
-            Arg::new("user")
-                .long("user")
-                .value_name("USER")
-                .help("Filter by effective user name or ID"),
-        )
-        .arg(
-            Arg::new("result")
-                .long("result")
-                .value_name("RESULT")
-                .value_parser(["success", "failed"])
-                .help("Filter by outcome"),
-        )
-        .arg(
-            Arg::new("format")
-                .long("format")
-                .value_name("FORMAT")
-                .value_parser(["legacy", "simple", "json"])
-                .help("Output format (default: simple)"),
-        )
-        .arg(
-            Arg::new("follow")
-                .long("follow")
-                .action(ArgAction::SetTrue)
-                .help("Stream events as they arrive (like tail -f)"),
-        )
-        .arg(
-            Arg::new("limit")
-                .long("limit")
-                .value_name("N")
-                .help("Maximum number of events to output"),
-        )
-        .arg(
-            Arg::new("file")
-                .value_name("FILE")
-                .help("Optional output file path; if omitted, writes to stdout"),
-        )
-}
 
 /// Builds the `search` subcommand.
 ///

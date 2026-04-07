@@ -8,8 +8,9 @@
 //! # CLI overview
 //!
 //! The root command is `auditrs`. A subcommand is required; running `auditrs`
-//! alone shows help. The tool inspects and manages audit events, the daemon,
-//! filters, watches, and configuration.
+//! alone shows help. Top-level subcommands are registered in this order:
+//! `start`, `stop`, `reboot`, `status`, `filter`, `watch`, `search`, `report`,
+//! `config`.
 //!
 //! ## Daemon control
 //!
@@ -20,55 +21,42 @@
 //! | `reboot` | Restart the daemon. |
 //! | `status` | Show whether the daemon is running. |
 //!
-//! ## `dump` — stream or write events
+//! ## `search` — query events
 //!
-//! Dump matching audit events to stdout or an optional file. Supports time
-//! range, type, user, result, format, streaming, and a limit.
+//! Search primary audit logs. An event matches when it satisfies the query (if
+//! any) and every filter that was passed.
 //!
-//! **Positional:** optional `FILE` — output path; if omitted, writes to stdout.
+//! **Positional:** `QUERY` (optional when `--field FIELD=VALUE` supplies the
+//! search term) — free text, or `key=value` to match a specific field.
 //!
 //! **Flags:**
 //!
-//! - `--since TIME` — events at or after this time (e.g. `2026-03-04T10:00`,
-//!   `-1h`).
-//! - `--until TIME` — events strictly before this time.
-//! - `--type EVENT_TYPE` — filter by event type (e.g. exec, file, auth).
-//! - `--user USER` — filter by effective user name or ID.
-//! - `--result success|failed` — filter by outcome.
-//! - `--format legacy|simple|json` — output format (default: simple).
-//! - `--follow` — stream events as they arrive (similar to `tail -f`).
-//! - `--limit N` — maximum number of events to output.
-//!
-//! ## `search` — query events
-//!
-//! Search audit events with a required query and optional filters.
-//!
-//! **Positional:** `QUERY` (required) — free-text or key-value search
-//! expression.
-//!
-//! **Flags:** `--since`, `--until`, `--type`, `--result` behave like `dump`.
-//! Additionally:
-//!
-//! - `--user` — filter by identity fields (`uid`, `auid`, …); use `uid=1000` /
-//!   `auid=…` to match a single field like `--field`.
-//! - `--field FIELD` or `--field FIELD=VALUE` — restrict search to a field;
-//!   with `=VALUE` and no QUERY, search for VALUE in that field only.
-//! - `--format table|json` — human-readable table or JSON.
-//! - `--limit N` — cap the number of matching events printed.
+//! - `--since` / `--until` — RFC3339 time window (inclusive start, exclusive end).
+//! - `--type` — shorthand category (`exec`, `file`, `auth`) or a specific record
+//!   type name (see the record-types link under `filter`).
+//! - `--user` — identity fields (`uid`, `auid`, …); use `uid=1000` style to
+//!   target one field.
+//! - `--result` — `success` or `failed` (syscall `success=` field).
+//! - `--field` — field name, or `FIELD=VALUE` when `QUERY` is omitted.
+//! - `--format simple|json` — output (default: `simple`).
+//! - `--limit N` — maximum number of matching events to print.
 //!
 //! ## `report` — aggregate summaries
 //!
-//! Summarize audit events over an optional time window with grouping and caps.
+//! Summarize audit events over an optional time window. Events are sorted
+//! earliest-to-latest before writing or printing.
 //!
 //! **Flags:**
 //!
-//! - `--since TIME` / `--until TIME` — report time window.
-//! - `--failed` — only include failed events.
-//! - `--format legacy|simple|json` — report output format (default: json).
-//! - `--no-save` — print to stdout instead of saving;
-//! - `--summary combine|separate|exclude` — generate a summary report with the
-//!   given disposition (default: combine).
-//! - `-o`/`--output PATH` — write the report to the given path.
+//! - `--since` / `--until` — RFC3339 time window.
+//! - `--format legacy|simple|json` — report body format (default: the daemon’s
+//!   configured log format when omitted).
+//! - `--summary combine|separate|exclude` — how to emit summary text (default:
+//!   `combine`).
+//! - `--no-save` — print to stdout instead of writing a file.
+//! - `--summary-only` — print only the summary (cannot be used with
+//!   `--summary=exclude`).
+//! - `-o` / `--output PATH` — output file path.
 //! - With no `-o`/`--output` and without `--no-save`, writes
 //!   `./reports/report_<timestamp>.<ext>`.
 //!

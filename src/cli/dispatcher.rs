@@ -55,7 +55,6 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
         Some(("stop", _)) => stop_auditrs(false)?,
         Some(("reboot", _)) => reboot_auditrs()?,
         Some(("status", _)) => status_auditrs()?,
-        Some(("dump", sub_m)) => handle_dump(sub_m)?,
         Some(("search", sub_m)) => handle_search(sub_m, &state)?,
         Some(("report", sub_m)) => handle_report(sub_m, &state)?,
         Some(("config", sub_m)) => handle_config(sub_m)?,
@@ -68,16 +67,6 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Dumps the contents of a selected auditrs log to a specified path.
-///
-/// **Parameters:**
-///
-/// * `matches`: CLI argument to match a handling function. Subcommands and
-///   flags of the argument can be used for further options.
-fn handle_dump(_matches: &ArgMatches) -> Result<()> {
-    todo!()
 }
 
 /// Searches auditrs logs for a supplied term or pattern.
