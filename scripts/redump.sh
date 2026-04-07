@@ -8,12 +8,7 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-echo -e "${BOLD}${BLUE}Resetting auditrs...${NORMAL}"
-
-sudo ./target/debug/auditrs stop
-
 sudo rm -rf /var/log/auditrs/*
-sudo rm -rf /etc/auditrs/*
-sudo rm -rf ./tmp/*
+sudo ./target/debug/auditrs reboot
 
-sudo auditctl -D
+sudo ./scripts/trigger_and_view_primary.sh

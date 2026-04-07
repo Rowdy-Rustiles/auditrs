@@ -20,8 +20,10 @@ use std::fs::{self, File};
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::config::{CONFIG_DIR, load_config};
 use crate::daemon::PID_FILE_NAME;
 use crate::daemon::worker::run_worker;
+use crate::rules::load_filters;
 
 /// Starts the `auditrs` daemon as a background process.
 ///
@@ -37,6 +39,12 @@ use crate::daemon::worker::run_worker;
 pub fn start_daemon() -> Result<()> {
     is_root()?;
     prepare_auditrs().context("Could not stop auditd service with systemctl")?;
+
+    // Ensure config + rules + log directories exist before daemonizing.
+    // This makes `auditrs start` and `auditrs reboot` resilient to missing
+    // `/etc/auditrs` or log directories (e.g. after manual cleanup).
+    ensure_required_directories()?;
+
     let pid = pid_file_path();
     if let Some(parent) = pid.parent() {
         fs::create_dir_all(parent)
@@ -83,6 +91,29 @@ pub fn start_daemon() -> Result<()> {
             }
         }
     }
+}
+
+/// Ensure on-disk directories and base files exist for daemon startup.
+///
+/// This is intentionally best-effort and idempotent: it creates missing
+/// directories but does not delete or migrate existing state.
+fn ensure_required_directories() -> Result<()> {
+    // Make sure the config directory exists (even if callers removed it).
+    fs::create_dir_all(CONFIG_DIR)
+        .with_context(|| format!("Could not create config directory {}", CONFIG_DIR))?;
+
+    // Ensure the rules file exists. `load_filters()` is the most conservative
+    // initializer: it will create an empty rules file when missing while
+    // preserving/initializing other top-level sections.
+    let _ = load_filters().context("Could not initialize rules file")?;
+
+    // Ensure log directories exist based on current config.
+    let cfg = load_config().context("Could not load config to initialize directories")?;
+    for dir in [&cfg.active_directory, &cfg.journal_directory, &cfg.primary_directory] {
+        fs::create_dir_all(dir)
+            .with_context(|| format!("Could not create log directory {}", dir))?;
+    }
+    Ok(())
 }
 
 /// Sends `SIGTERM` to the running daemon (used by `auditrs stop`).

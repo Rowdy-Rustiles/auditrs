@@ -5,8 +5,9 @@
 //! function wraps lower-level primitives from `crate::daemon::daemon` and adds
 //! user-friendly status output suitable for terminal use.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use colorized::*;
+use std::time::Duration;
 
 use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 
@@ -22,7 +23,9 @@ use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 ///   that reboot flows remain quiet.
 pub fn start_auditrs(reboot: bool) -> Result<()> {
     if is_running()? {
-        colorize_println("Daemon is already running", Colors::BrightGreenFg);
+        if !reboot {
+            colorize_println("Daemon is already running", Colors::BrightGreenFg);
+        }
         return Ok(());
     }
     println!("Starting auditrs...");
@@ -67,7 +70,23 @@ pub fn reboot_auditrs() -> Result<()> {
         return Ok(());
     }
     colorize_println("Rebooting auditRS", Colors::BrightBlueFg);
-    let _ = stop_auditrs(true)?;
+    stop_auditrs(true)?;
+
+    // Short wait to ensure the old daemon is cleaned up
+    let mut waited_ms: u64 = 0;
+    let step = Duration::from_millis(50);
+    let timeout = Duration::from_secs(3);
+    while is_running()? {
+        if Duration::from_millis(waited_ms) >= timeout {
+            return Err(anyhow!(
+                "Timed out waiting for daemon to stop during reboot (waited {}ms)",
+                waited_ms
+            ));
+        }
+        std::thread::sleep(step);
+        waited_ms += step.as_millis() as u64;
+    }
+
     start_auditrs(true)?;
     colorize_println("Auditrs rebooted successfully", Colors::BrightGreenFg);
     Ok(())
