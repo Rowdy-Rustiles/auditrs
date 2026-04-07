@@ -101,41 +101,89 @@ fn build_dump() -> ClapCommand {
 fn build_search() -> ClapCommand {
     ClapCommand::new("search")
         .about("Search audit events")
+        .long_about("Returns any events that match the search query and/or its options")
         .arg(
             Arg::new("query")
                 .value_name("QUERY")
-                .required(true)
+                .required(false)
                 .help("Free-text or key-value search expression"),
         )
         .arg(
             Arg::new("since")
                 .long("since")
                 .value_name("TIME")
-                .help("Only include events at or after this time"),
+                .help("Only include events at or after this time")
+                .long_help(
+                    "Start time of the window for the report (inclusive).\n
+Input should be formatted as a RFC3339 timestamp, see the following resources for more information:
+<https://time.now/tool/rfc-3339-converter/>, <https://datatracker.ietf.org/doc/html/rfc3339>.
+YYYY-MM-DDTHH:MM:SS[.mmm]Z
+
+Examples:
+- 2026-03-04T10:00:00Z
+- 2026-03-04T10:00:00.000Z
+                ",
+                ),
         )
         .arg(
             Arg::new("until")
                 .long("until")
                 .value_name("TIME")
-                .help("Only include events strictly before this time"),
+                .help("Only include events strictly before this time")
+                .long_help(
+                    "End time of the window for the report (exclusive).\n
+Input should be formatted as a RFC3339 timestamp, see the following resources for more information:
+<https://time.now/tool/rfc-3339-converter/>, <https://datatracker.ietf.org/doc/html/rfc3339>.
+YYYY-MM-DDTHH:MM:SS[.mmm]Z
+
+Examples:
+- 2026-03-04T10:00:00Z
+- 2026-03-04T10:00:00.000Z
+                ",
+                ),
         )
         .arg(
             Arg::new("field")
                 .long("field")
-                .value_name("FIELD")
-                .help("Restrict the search to a specific field (e.g. exe, path, syscall)"),
+                .value_name("FIELD=VALUE")
+                .help(
+                    "Restrict the search to a field (e.g. exe). Use field=value to set the search \
+                     term when QUERY is omitted (e.g. --field exe=/usr/bin/ls)",
+                )
+                .long_help(
+                    "Restrict the search to a field (e.g. exe). Use field=value to set the search \
+                     term when QUERY is omitted (e.g. --field exe=/usr/bin/ls). \n
+Possible fields to query by include, but are not limited to the fields found here:
+<https://access.redhat.com/articles/4409591?extIdCarryOver=true&sc_cid=RHCTG0180000382536#audit-event-fields-1>."
+                ),
         )
         .arg(
             Arg::new("type")
                 .long("type")
                 .value_name("EVENT_TYPE")
-                .help("Filter by event type"),
+                .help("Filter by event type")
+                .long_help(
+                    "Filter by event type \n
+A few blanket types covering multiple record types are available: <exec, file, auth>.
+More specific event types can be found here 
+<https://github.com/Rowdy-Rustiles/docs/blob/main/Reference/Record%20Types.md>.
+"
+
+                ),
         )
         .arg(
             Arg::new("user")
                 .long("user")
-                .value_name("USER")
-                .help("Filter by user"),
+                .value_name("USER_KEY=VALUE")
+                .help(
+                    "Filter by user ID/name across uid/auid/euid/… fields, or restrict with \
+                     uid=1000, auid=…, etc.",
+                )
+                .long_help(
+                    "Filter by user ID/name across uid/auid/euid/… fields, or restrict with \
+                     uid=1000, auid=…, etc. \n
+Possible keys: <uid, auid, euid, gid, egid, ouid, fsuid, loginuid, suid, ses>. "
+                ),
         )
         .arg(
             Arg::new("result")
@@ -148,7 +196,7 @@ fn build_search() -> ClapCommand {
             Arg::new("format")
                 .long("format")
                 .value_name("FORMAT")
-                .value_parser(["table", "json"])
+                .value_parser(["simple", "json"])
                 .help("Output as a human-readable table or JSON"),
         )
         .arg(

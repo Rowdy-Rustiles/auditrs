@@ -46,10 +46,13 @@
 //! **Positional:** `QUERY` (required) — free-text or key-value search
 //! expression.
 //!
-//! **Flags:** `--since`, `--until`, `--type`, `--user`, and `--result` behave
-//! like `dump`. Additionally:
+//! **Flags:** `--since`, `--until`, `--type`, `--result` behave like `dump`.
+//! Additionally:
 //!
-//! - `--field FIELD` — restrict search to a field (e.g. exe, path, syscall).
+//! - `--user` — filter by identity fields (`uid`, `auid`, …); use `uid=1000` /
+//!   `auid=…` to match a single field like `--field`.
+//! - `--field FIELD` or `--field FIELD=VALUE` — restrict search to a field;
+//!   with `=VALUE` and no QUERY, search for VALUE in that field only.
 //! - `--format table|json` — human-readable table or JSON.
 //! - `--limit N` — cap the number of matching events printed.
 //!

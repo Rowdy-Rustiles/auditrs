@@ -51,6 +51,11 @@ pub fn generate_report(state: &State, matches: &ArgMatches) -> Result<()> {
     };
 
     events = apply_time_window(&matches, events)?;
+    events.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then_with(|| a.serial.cmp(&b.serial))
+    });
     let summary = build_summary_disposition(&matches, &events);
 
     // Extra conversion as a validation check, format value should be validated by

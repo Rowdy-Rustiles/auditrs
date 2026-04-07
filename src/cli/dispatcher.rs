@@ -41,6 +41,7 @@ use crate::rules::{
 };
 use crate::state::State;
 use crate::tools::report::generate_report;
+use crate::tools::search::search_events;
 
 /// Top-level entry point for handling CLI subcommands
 ///
@@ -55,7 +56,7 @@ pub fn dispatch(matches: &ArgMatches) -> Result<()> {
         Some(("reboot", _)) => reboot_auditrs()?,
         Some(("status", _)) => status_auditrs()?,
         Some(("dump", sub_m)) => handle_dump(sub_m)?,
-        Some(("search", sub_m)) => handle_search(sub_m)?,
+        Some(("search", sub_m)) => handle_search(sub_m, &state)?,
         Some(("report", sub_m)) => handle_report(sub_m, &state)?,
         Some(("config", sub_m)) => handle_config(sub_m)?,
         Some(("filter", sub_m)) => handle_filter(sub_m, &state)?,
@@ -85,8 +86,8 @@ fn handle_dump(_matches: &ArgMatches) -> Result<()> {
 ///
 /// * `matches`: CLI argument to match a handling function. Subcommands and
 ///   flags of the argument can be used for further options
-fn handle_search(_matches: &ArgMatches) -> Result<()> {
-    todo!()
+fn handle_search(matches: &ArgMatches, state: &State) -> Result<()> {
+    search_events(state, matches)
 }
 
 /// Generates a report on the audit logs with statistical analysis of their
