@@ -1,9 +1,8 @@
 //! System for defining the directories to be watched and audited into the
 //! primary log.
 //!
-//! Defines auditrs's watch feature. This is a wrapper around the
-//! auditctl command as well as the logic behind how auditrs stores and manages
-//! watches.
+//! Defines auditrs's watch feature: kernel path rules via netlink plus how
+//! auditrs stores and manages watches in `rules.toml`.
 
 mod watches;
 

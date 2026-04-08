@@ -12,9 +12,16 @@
 //!
 //! The `NetlinkAuditTransport` struct is used to transport the raw audit
 //! records to the parser.
+//!
+//! [`apply_audit_rule_message`] uses separate short-lived netlink sessions to
+//! add or delete kernel rules (e.g. path watches), distinct from the event
+//! listener.
 
 mod netlink;
 mod raw_record;
+mod rule_session;
+
+pub use rule_session::apply_audit_rule_message;
 
 /// A raw audit record received from the kernel via netlink.
 #[derive(Debug, PartialEq)]
