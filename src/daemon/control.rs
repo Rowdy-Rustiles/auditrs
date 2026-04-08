@@ -21,15 +21,23 @@ use crate::daemon::daemon::{is_running, read_pid, start_daemon, stop_daemon};
 /// * `reboot`: Indicates whether this start is part of a reboot sequence. When
 ///   `true`, success messages intended for interactive users are suppressed so
 ///   that reboot flows remain quiet.
-pub fn start_auditrs(reboot: bool) -> Result<()> {
+/// * `skip_auditd_preflight`: If true, do not fail when legacy `auditd` appears
+///   to be running (CLI: `--force`). Unsafe if auditd actually holds the audit
+///   session.
+pub fn start_auditrs(reboot: bool, skip_auditd_preflight: bool) -> Result<()> {
     if is_running()? {
         if !reboot {
             colorize_println("Daemon is already running", Colors::BrightGreenFg);
         }
         return Ok(());
     }
+    if skip_auditd_preflight {
+        println!(
+            "Warning: skipping auditd preflight (--force). Starting alongside legacy auditd may break the audit session."
+        );
+    }
     println!("Starting auditrs...");
-    start_daemon().context("Failed to start daemon")?;
+    start_daemon(skip_auditd_preflight).context("Failed to start daemon")?;
     if !reboot {
         colorize_println("Auditrs started successfully", Colors::BrightGreenFg);
     }
@@ -64,13 +72,13 @@ pub fn stop_auditrs(reboot: bool) -> Result<()> {
 /// process. Configuration is reloaded as part of the restart sequence.
 /// For a dynamic, in-place configuration reload without a full restart,
 /// prefer `reload_auditrs`.
-pub fn reboot_auditrs() -> Result<()> {
+pub fn reboot_auditrs(skip_auditd_preflight: bool) -> Result<()> {
     // If the daemon is not running, we don't need to reboot
     if !is_running()? {
         return Ok(());
     }
     colorize_println("Rebooting auditRS", Colors::BrightBlueFg);
-    stop_auditrs(true)?;
+    let _ = stop_auditrs(true)?;
 
     // Short wait to ensure the old daemon is cleaned up
     let mut waited_ms: u64 = 0;
@@ -87,7 +95,7 @@ pub fn reboot_auditrs() -> Result<()> {
         waited_ms += step.as_millis() as u64;
     }
 
-    start_auditrs(true)?;
+    start_auditrs(true, skip_auditd_preflight).context("Failed to start daemon")?;
     colorize_println("Auditrs rebooted successfully", Colors::BrightGreenFg);
     Ok(())
 }

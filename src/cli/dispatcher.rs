@@ -51,9 +51,9 @@ use crate::tools::search::search_events;
 pub fn dispatch(matches: &ArgMatches) -> Result<()> {
     let state = State::load_state()?;
     match matches.subcommand() {
-        Some(("start", _)) => start_auditrs(false)?,
+        Some(("start", sub)) => start_auditrs(false, sub.get_flag("force"))?,
         Some(("stop", _)) => stop_auditrs(false)?,
-        Some(("reboot", _)) => reboot_auditrs()?,
+        Some(("reboot", sub)) => reboot_auditrs(sub.get_flag("force"))?,
         Some(("status", _)) => status_auditrs()?,
         Some(("search", sub_m)) => handle_search(sub_m, &state)?,
         Some(("report", sub_m)) => handle_report(sub_m, &state)?,
