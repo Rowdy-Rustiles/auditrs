@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
 use toml;
 
 use crate::config::{CONFIG_DIR, FILTER_FILE_EXTENSIONS, RULES_FILE};
-use crate::rules::{AuditWatch, WatchAction, Watches, execute_watch_auditctl_command};
+use crate::rules::{AuditWatch, WatchAction, Watches, apply_watch_kernel_rule};
 use crate::state::State;
 use crate::utils::{
     FilePathCompleter,
@@ -262,7 +262,7 @@ pub fn add_watch_interactive() -> Result<()> {
         key,
     };
     // Create the watch in the Linux audit system
-    execute_watch_auditctl_command(&watch, false)?;
+    apply_watch_kernel_rule(&watch, false)?;
     // Then persist the watch to the auditrs rules file
     set_watch(watch)
 }
@@ -297,7 +297,7 @@ pub fn add_watch(path: &str, actions: Vec<WatchAction>, recursive: bool) -> Resu
         "watch add",
     )?;
 
-    execute_watch_auditctl_command(&watch, false)?;
+    apply_watch_kernel_rule(&watch, false)?;
     set_watch(watch)
 }
 
@@ -314,14 +314,14 @@ pub fn remove_watch_by_key(state: &State, key: &str) -> Result<()> {
         .find(|w| w.key == key)
         .ok_or_else(|| anyhow!("watch with key '{}' not found", key))?;
 
-    execute_watch_auditctl_command(watch, true)?;
+    apply_watch_kernel_rule(watch, true)?;
     remove_watch(key)
 }
 
 /// Update an existing watch by key non-interactively.
 ///
 /// Unlike the interactive updater, this updates both the persisted rules file
-/// and the live kernel rule (via auditctl).
+/// and the live kernel rule (via netlink).
 pub fn update_watch_by_key(
     state: &State,
     key: &str,
@@ -359,8 +359,8 @@ pub fn update_watch_by_key(
     };
 
     // Update live kernel rule first (remove old, add new), then persist.
-    execute_watch_auditctl_command(old_watch, true)?;
-    execute_watch_auditctl_command(&new_watch, false)?;
+    apply_watch_kernel_rule(old_watch, true)?;
+    apply_watch_kernel_rule(&new_watch, false)?;
     update_watch(key, new_watch)
 }
 
@@ -484,7 +484,7 @@ pub fn remove_watch_interactive(state: &State) -> Result<()> {
 
     let watch_to_remove = watches.iter().find(|w| w.key == selected_key);
     if let Some(watch) = watch_to_remove {
-        execute_watch_auditctl_command(watch, true)?;
+        apply_watch_kernel_rule(watch, true)?;
     } else {
         unreachable!("Validator should be preventing this state")
     }

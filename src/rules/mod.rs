@@ -4,22 +4,22 @@
 //! which audit records are written, transformed, or ignored:
 //! - `filters` provides record-type based rules and interactive CLI flows for
 //!   listing, adding, updating, removing, importing, and dumping filters.
-//! - `watches` provides path-based rules backed by `auditctl`, together with
-//!   import/export helpers and interactive management.
+//! - `watches` provides path-based rules backed by kernel netlink watch rules,
+//!   together with import/export helpers and interactive management.
 //! A `Rules` value combines both `Filters` and `Watches` and is used by the
 //! daemon state to enforce the current rule set.
 
-pub mod auditctl;
 pub mod filters;
+pub mod kernel_watches;
 pub mod watches;
 
-pub use auditctl::execute_watch_auditctl_command;
 pub use filters::*;
+pub use kernel_watches::apply_watch_kernel_rule;
 pub use watches::*;
 
 use serde::Deserialize;
 
-const AUDIT_RULES_FILE: &str = "/etc/audit/audit.rules";
+pub(crate) const AUDIT_RULES_FILE: &str = "/etc/audit/audit.rules";
 
 /// Audit rules are collections of filters and watches that are applied to
 /// audit events before they can be written to the primary log.
