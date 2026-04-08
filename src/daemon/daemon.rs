@@ -7,8 +7,8 @@
 //!   stdout/stderr, and driving the main worker loop.
 //! - **PID management**: creating, locating, reading, and cleaning up the PID
 //!   file that identifies the running daemon.
-//! - **Environment preparation**: ensuring that the legacy `auditd` service is
-//!   disabled before `auditrs` starts.
+//! - **Environment preparation**: verifying that the legacy `auditd` service is
+//!   not running (we do not stop it automatically; the operator must do that).
 //!
 //! In the future, this behavior may be integrated with `systemd` or other
 //! service managers, but for now it uses a traditional double-fork style
@@ -18,10 +18,10 @@ use anyhow::{Context, Result, anyhow};
 use daemonize::{Daemonize, Outcome};
 use std::fs::{self, File};
 use std::path::PathBuf;
-use std::process::Command;
 
 use crate::config::{CONFIG_DIR, load_config};
 use crate::daemon::PID_FILE_NAME;
+use crate::daemon::auditd_preflight::ensure_auditd_not_running;
 use crate::daemon::worker::run_worker;
 use crate::rules::load_filters;
 
@@ -30,15 +30,15 @@ use crate::rules::load_filters;
 /// This function:
 ///
 /// - Verifies that the caller has root privileges.
-/// - Prepares the environment by disabling the legacy `auditd` service.
+/// - Verifies the legacy `auditd` service is not running (does not stop it).
 /// - Forks into a background daemon using the `daemonize` crate.
 /// - In the parent process, briefly waits and then checks that the PID file
 ///   exists to confirm successful startup.
 /// - In the child process, runs the asynchronous worker loop and ensures the
 ///   PID file is cleaned up on exit via `FileGuard`.
 pub fn start_daemon() -> Result<()> {
-    is_root()?;
-    prepare_auditrs().context("Could not stop auditd service with systemctl")?;
+    is_root().context("User is not running with root privileges")?;
+    ensure_auditd_not_running().context("Legacy auditd service is running")?;
 
     // Ensure config + rules + log directories exist before daemonizing.
     // This makes `auditrs start` and `auditrs reboot` resilient to missing
@@ -202,24 +202,6 @@ fn is_root() -> Result<()> {
             Err(anyhow!("User is not running with root privileges"))
         }
     }
-}
-
-/// Ensures that the legacy `auditd` service is no longer running.
-///
-/// This helper enables auditing via `auditctl -e 1` and then stops the
-/// `auditd` service, preparing the system for `auditrs` to take over. It is
-/// intentionally conservative and will error if the underlying shell command
-/// fails.
-///
-/// TODO: This will fail if either `auditctl` or `auditd` are not installed on
-/// the host system; we may want to detect and handle that case more gracefully.
-fn prepare_auditrs() -> Result<()> {
-    Command::new("sh")
-        .arg("-c")
-        .arg("auditctl -e 1 && service auditd stop")
-        .output()
-        .context("Command failed: `auditctl -e 1 && service auditd stop`")?;
-    Ok(())
 }
 
 /// Guard object that owns the daemon's PID file and cleans it up on drop.
