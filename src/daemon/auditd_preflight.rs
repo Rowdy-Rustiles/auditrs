@@ -3,7 +3,12 @@
 //!
 //! We do **not** stop `auditd` or other services automatically. If legacy
 //! `auditd` appears to be running, startup fails with instructions so the
-//! operator can stop it explicitly.
+//! operator can stop it explicitly, unless daemon startup is told to skip this
+//! check (CLI: `--force`).
+//!
+//! When systemd is available, we consult `systemctl is-active` for the unit,
+//! then always run process / pid-file checks so a manually started `auditd` is
+//! still detected.
 
 use anyhow::{Context, Result, anyhow};
 use std::path::{Path, PathBuf};
@@ -16,9 +21,8 @@ use std::process::Command;
 pub fn ensure_auditd_not_running() -> Result<()> {
     if use_systemd_preflight() {
         systemd_auditd_must_be_inactive()?;
-    } else {
-        proc_auditd_must_be_absent()?;
     }
+    proc_auditd_must_be_absent()?;
     Ok(())
 }
 
@@ -66,7 +70,7 @@ fn proc_auditd_must_be_absent() -> Result<()> {
                  Stop the legacy audit daemon before starting auditrs so only one process owns the audit netlink session."
             ));
         }
-        Ok(_) => return Ok(()),
+        Ok(_) => {}
         Err(_) => {
             // No pidof (minimal systems): fall through to pid files.
         }

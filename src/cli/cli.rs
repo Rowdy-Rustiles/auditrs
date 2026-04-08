@@ -6,6 +6,13 @@
 
 use clap::{Arg, ArgAction, Command as ClapCommand};
 
+fn daemon_auditd_force_arg() -> Arg {
+    Arg::new("force")
+        .long("force")
+        .action(ArgAction::SetTrue)
+        .help("Skip the auditd conflict preflight (unsafe if legacy auditd is actually running)")
+}
+
 /// Builds the top-level command-line interface for the `auditrs` binary.
 ///
 /// This function defines the root command and registers all supported
@@ -16,9 +23,17 @@ pub fn build_cli() -> ClapCommand {
         .about("Inspect and manage audit events and configuration")
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(ClapCommand::new("start").about("Start the auditrs daemon and event pipeline"))
+        .subcommand(
+            ClapCommand::new("start")
+                .about("Start the auditrs daemon and event pipeline")
+                .arg(daemon_auditd_force_arg()),
+        )
         .subcommand(ClapCommand::new("stop").about("Stop the running auditrs daemon"))
-        .subcommand(ClapCommand::new("reboot").about("Restart the auditrs daemon (stop + start)"))
+        .subcommand(
+            ClapCommand::new("reboot")
+                .about("Restart the auditrs daemon (stop + start)")
+                .arg(daemon_auditd_force_arg()),
+        )
         .subcommand(ClapCommand::new("status").about("Show whether the daemon is running"))
         .subcommand(build_filter())
         .subcommand(build_watch())
@@ -490,6 +505,21 @@ mod tests {
         };
 
         assert_eq!(sub_m.get_one::<String>("query").unwrap(), "uid=1000");
+    }
+
+    #[test]
+    fn parses_start_with_force() {
+        let cmd = build_cli();
+        let matches = cmd
+            .clone()
+            .try_get_matches_from(["auditrs", "start", "--force"])
+            .expect("arguments should parse");
+
+        let ("start", sub_m) = matches.subcommand().expect("expected start subcommand") else {
+            unreachable!();
+        };
+
+        assert!(sub_m.get_flag("force"));
     }
 
     #[test]

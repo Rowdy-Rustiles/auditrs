@@ -30,21 +30,25 @@ use crate::rules::load_filters;
 /// This function:
 ///
 /// - Verifies that the caller has root privileges.
-/// - Verifies the legacy `auditd` service is not running (does not stop it).
+/// - Verifies the legacy `auditd` service is not running (does not stop it),
+///   unless `skip_auditd_preflight` is true (CLI: `--force`).
 /// - Forks into a background daemon using the `daemonize` crate.
 /// - In the parent process, briefly waits and then checks that the PID file
 ///   exists to confirm successful startup.
 /// - In the child process, runs the asynchronous worker loop and ensures the
 ///   PID file is cleaned up on exit via `FileGuard`.
-pub fn start_daemon() -> Result<()> {
+pub fn start_daemon(skip_auditd_preflight: bool) -> Result<()> {
     is_root().context("User is not running with root privileges")?;
-    ensure_auditd_not_running().context("Legacy auditd service is running")?;
+
+    if !skip_auditd_preflight {
+        ensure_auditd_not_running().context("Legacy auditd service is running")?;
+    }
 
     // Ensure config + rules + log directories exist before daemonizing.
     // This makes `auditrs start` and `auditrs reboot` resilient to missing
     // `/etc/auditrs` or log directories (e.g. after manual cleanup).
     ensure_required_directories()?;
-
+    
     let pid = pid_file_path();
     if let Some(parent) = pid.parent() {
         fs::create_dir_all(parent)
