@@ -16,6 +16,16 @@ AuditRS is aimed at being a modern, efficient, and flexible replacement for the 
 - **Modernization**: Provide a more user-friendly output format and configuration system, enriching the logs with additional context where possible.
 - **Compatibility**: Maintain compatibility with existing audit rules, formats, and tools where possible, while also allowing for modern improvements.
 
+# Installation
+AuditRS must be made available to sudo environment for proper usage. To do so, download the binary and copy it to `/usr/bin`:
+```bash
+sudo cp auditrs /usr/bin
+```
+After this is complete, AuditRS will become available for use on the next shell reboot. Note that its functionality relies on its elevated privilege; commands must be prepended with `sudo`:
+```bash
+sudo auditrs start
+```
+
 # Terms and Definitions
 - **Audit Record**: A structured representation of an audit event, containing fields such as timestamp, event type, user ID, etc.
 - **Audit Event**: A single occurrence of an action or operation that is logged by the audit system.
