@@ -40,6 +40,7 @@
 //! - `--field` — field name, or `FIELD=VALUE` when `QUERY` is omitted.
 //! - `--format simple|json` — output (default: `simple`).
 //! - `--limit N` — maximum number of matching events to print.
+//! - `-o` / `--output [PATH]` — also write results to a file (`-o` alone → `./search/search_<timestamp>.<ext>`).
 //!
 //! ## `report` — aggregate summaries
 //!

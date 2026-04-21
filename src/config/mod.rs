@@ -19,7 +19,7 @@ pub use config::{get_config, load_config, set_config};
 use serde::Deserialize;
 
 /// The minimum log size for the auditrs daemon.
-pub const MINIMUM_LOG_SIZE: usize = 1048576; // 1 MB
+pub const MINIMUM_LOG_SIZE: usize = 20000; // 1 MB
 /// The minimum journal size for the auditrs daemon.
 pub const MINIMUM_JOURNAL_SIZE: usize = 16; // 16 logs
 /// The minimum primary size for the auditrs daemon.
