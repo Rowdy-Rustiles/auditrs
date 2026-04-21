@@ -498,6 +498,15 @@ impl AuditLogWriter {
         let active_path = self.active.path.clone();
         let ext = self.log_format.get_extension();
 
+        // Avoid creating empty journal entries (happens on startup /
+        // config reload before the first event is written).
+        match std::fs::metadata(&active_path) {
+            Ok(meta) if meta.len() == 0 => return Ok(()),
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e.into()),
+        }
+
         // New journal file name
         let journal_index = self.journal.paths.len();
         let journal_path = self.journal_directory.join(format!(
