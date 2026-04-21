@@ -2,9 +2,10 @@
 //!
 //! Searches correlated audit events in the primary log directory with optional
 //! filters (time range, field, event category, user, syscall outcome) and
-//! prints matches as a table or JSON.
+//! prints matches with simple or JSON format.
 
 use std::borrow::Cow;
+use std::fs::{OpenOptions, create_dir_all};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -18,11 +19,7 @@ use crate::core::parser::ParsedAuditRecord;
 use crate::core::parser::RecordType;
 use crate::state::State;
 use crate::utils::{
-    parse_rfc3339_timestamp,
-    read_from_json,
-    read_from_legacy,
-    read_from_simple,
-    systemtime_to_utc_string,
+    current_utc_string, parse_rfc3339_timestamp, read_from_json, read_from_legacy, read_from_simple, systemtime_to_utc_string
 };
 
 /// Loads primary logs, applies CLI filters and the query expression, and prints
@@ -114,9 +111,11 @@ pub fn search_events(state: &State, matches: &ArgMatches) -> Result<()> {
         }
     }
 
+    let output_path = matches.get_one::<String>("output_path").map(|s| s.as_str());
+
     match output_format {
-        "json" => print_json(&matched)?,
-        "simple" => print_simple(&matched)?,
+        "json" => format_json(&matched, output_path)?,
+        "simple" => format_simple(&matched, output_path)?,
         other => anyhow::bail!("Unsupported output format: {:?}", other),
     }
 
@@ -505,17 +504,51 @@ fn free_text_matches(event: &AuditEvent, needle: &str, restrict_field: Option<&s
     false
 }
 
+fn default_search_path(format: LogFormat) -> PathBuf {
+    let ts = current_utc_string().replace(':', "-");
+    PathBuf::from(format!(
+        "./search/search_{}.{}",
+        ts,
+        format.get_extension()
+    ))
+}
+
 /// Writes a short count line and each event using the simple (`Display`) format.
 ///
 /// **Parameters:**
 ///
 /// * `events`: Matched events to print to stdout.
-fn print_simple(events: &[AuditEvent]) -> Result<()> {
+/// * `output_path`: Path to write the events to.
+fn format_simple(events: &[AuditEvent], output_path: Option<&str>) -> Result<()> {
     let mut out = io::stdout().lock();
+    
     writeln!(out, "Found {} events \n", events.len())?;
-    for event in events {
-        write!(out, "{event}")?;
+    let payload = events.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n");
+    if let Some(path) = output_path {
+        let mut path =  if path.is_empty() {
+            default_search_path(LogFormat::Simple)
+        } else {
+            PathBuf::from(path)
+        };
+
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                create_dir_all(parent)?;
+            }
+        }
+
+        if path.extension().is_none() {
+            path.set_extension(LogFormat::Simple.get_extension());
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
+        writeln!(file, "{payload}")?;
     }
+    writeln!(out, "{payload}")?;
     Ok(())
 }
 
@@ -525,8 +558,10 @@ fn print_simple(events: &[AuditEvent]) -> Result<()> {
 /// **Parameters:**
 ///
 /// * `events`: Matched events to serialize to stdout.
-fn print_json(events: &[AuditEvent]) -> Result<()> {
+/// * `output_path`: Path to write the events to.
+fn format_json(events: &[AuditEvent], output_path: Option<&str>) -> Result<()> {
     let mut out = io::stdout().lock();
+
     // Use the same record-type spelling as simple-format logs (`record_type:
     // ConfigChange` from `Debug`), not serde's SCREAMING_SNAKE_CASE or kernel
     // `as_audit_str()`.
@@ -549,6 +584,30 @@ fn print_json(events: &[AuditEvent]) -> Result<()> {
         })
         .collect();
     let body = serde_json::to_string_pretty(&payload)?;
+    if let Some(path) = output_path {
+        let mut path = if path.is_empty() {
+            default_search_path(LogFormat::Json)
+        } else {
+            PathBuf::from(path)
+        };
+
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                create_dir_all(parent)?;
+            }
+        }
+
+        if path.extension().is_none() {
+            path.set_extension(LogFormat::Json.get_extension());
+        }
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
+        writeln!(file, "{body}")?;
+    }
     writeln!(out, "Found {} events \n", events.len())?;
     writeln!(out, "{body}")?;
     Ok(())

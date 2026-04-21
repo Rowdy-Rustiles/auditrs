@@ -155,6 +155,16 @@ Possible keys: <uid, auid, euid, gid, egid, ouid, fsuid, loginuid, suid, ses>. "
                 .value_name("N")
                 .help("Maximum number of matching events to print"),
         )
+         .arg(
+            Arg::new("output_path")
+                .short('o')
+                .long("output")
+                .required(false)
+                .num_args(0..=1)
+                .default_missing_value("")
+                .value_name("PATH")
+                .help("Path to write the report to"),
+        )
 }
 
 /// Builds the `report` subcommand.
